@@ -41,7 +41,7 @@ export default function Sidebar() {
               <span className="font-medium">{item.name}</span>
             </Link>
           );
-        });}
+        })}
       </nav>
 
       <div className="p-4 border-t border-zinc-800">
