@@ -11,6 +11,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cards, setCards] = useState([]);
+  const [unpaidExpensesGlobal, setUnpaidExpensesGlobal] = useState([]);
   
   const getLocalDate = () => {
     const d = new Date();
@@ -63,6 +64,13 @@ export default function Expenses() {
         
       if (error) throw error;
       setExpenses(data || []);
+
+      // ── GLOBAL UNPAID EXPENSES (Absolute Limit) ──
+      const { data: globalData } = await supabase.from('expenses')
+        .select('*')
+        .not('card_id', 'is', null)
+        .eq('status', 'pending');
+      setUnpaidExpensesGlobal(globalData || []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -182,7 +190,8 @@ export default function Expenses() {
   const filteredList = expenses.filter(e => activeTab === 'all' || (activeTab === 'debit' && !e.card_id) || e.card_id === activeTab);
   
   const invoices = cards.map(c => {
-    const total = expenses.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
+    // Cálculo do limite DEVE ser absoluto (global)
+    const total = unpaidExpensesGlobal.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
     const pct = c.credit_limit > 0 ? Math.min((total / c.credit_limit) * 100, 100) : 0;
     return { ...c, invoiceTotal: total, pct };
   });
@@ -194,12 +203,6 @@ export default function Expenses() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent">Minhas Despesas</h1>
           <p className="text-muted mt-1 text-sm md:text-base">Gerencie cartões e pague suas faturas</p>
-        </div>
-        
-        <div className="flex items-center justify-between sm:justify-end gap-2 bg-surface/80 border border-border p-2 rounded-xl">
-          <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronLeft size={20} /></button>
-          <span className="min-w-[140px] text-center font-bold capitalize text-content text-sm md:text-base">{monthName}</span>
-          <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronRight size={20} /></button>
         </div>
       </div>
 
@@ -312,12 +315,20 @@ export default function Expenses() {
 
         {/* Histórico/Lista */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x">
-             <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
-             <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
-             {cards.map(c => (
-               <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all")}>{c.name}</button>
-             ))}
+           <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x w-full md:w-auto">
+               <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
+               <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
+               {cards.map(c => (
+                 <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all")}>{c.name}</button>
+               ))}
+             </div>
+
+             <div className="flex items-center justify-between gap-2 bg-surface/80 border border-border p-1.5 rounded-xl w-full md:w-auto">
+               <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronLeft size={18} /></button>
+               <span className="min-w-[130px] text-center font-bold capitalize text-content text-xs md:text-sm">{monthName}</span>
+               <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronRight size={18} /></button>
+             </div>
            </div>
 
           {loading ? (
