@@ -212,10 +212,10 @@ export default function Dashboard() {
         <div className="h-48 sm:h-64 md:h-72 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={evolutionData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="name" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => showBalances ? `R$ ${val}` : '**'} />
-              <BarTooltip cursor={{ fill: 'var(--border)', opacity: 0.4 }} contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '12px', color: 'var(--content)' }} itemStyle={{ color: '#fb7185', fontWeight: 'bold' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="name" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => showBalances ? `R$ ${val}` : '**'} />
+              <BarTooltip cursor={{ fill: '#27272a', opacity: 0.4 }} contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#f4f4f5' }} itemStyle={{ color: '#fb7185', fontWeight: 'bold' }} />
               <Bar dataKey="total" fill="#fb7185" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
@@ -228,7 +228,7 @@ export default function Dashboard() {
            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Despesas por Categoria</h3>
            {expensesByCategory.length > 0 ? (
              <>
-               <div className="h-56 md:h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expensesByCategory} innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">{expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><PieTooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px', color: 'var(--content)', fontSize: '12px' }} itemStyle={{ color: '#fff' }}/></PieChart></ResponsiveContainer></div>
+               <div className="h-56 md:h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expensesByCategory} innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">{expensesByCategory.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie><PieTooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#f4f4f5', fontSize: '12px' }} itemStyle={{ color: '#fff' }}/></PieChart></ResponsiveContainer></div>
                <div className="flex flex-wrap gap-2 md:gap-4 mt-6 justify-center">
                  {expensesByCategory.map(cat => (
                    <div key={cat.name} className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted bg-background/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-border">
