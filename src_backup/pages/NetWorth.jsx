@@ -74,31 +74,31 @@ export default function NetWorth() {
     <div className="space-y-6 md:space-y-8 max-w-7xl mx-auto pb-12 w-full">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Balanço Geral</h1>
-        <p className="text-muted mt-1 text-sm md:text-base">Acompanhe a evolução histórica do seu patrimônio (Rendas Totais - Gastos Totais)</p>
+        <p className="text-zinc-400 mt-1 text-sm md:text-base">Acompanhe a evolução histórica do seu patrimônio (Rendas Totais - Gastos Totais)</p>
       </div>
 
       {loading ? (
-        <div className="flex justify-center p-12 text-muted"><Loader2 className="animate-spin" /></div>
+        <div className="flex justify-center p-12 text-zinc-500"><Loader2 className="animate-spin" /></div>
       ) : accumulatedData.length === 0 ? (
-        <div className="bg-surface/30 border border-border/50 border-dashed rounded-2xl p-12 text-center text-muted flex flex-col items-center">
+        <div className="bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-2xl p-12 text-center text-zinc-500 flex flex-col items-center">
             <Wallet size={48} className="text-zinc-700 mb-4" />
             <p>Nenhuma movimentação histórica capturada.</p>
         </div>
       ) : (
         <div className="space-y-6">
            
-           <div className="bg-surface/80 border border-border rounded-2xl p-8 relative overflow-hidden flex flex-col items-center justify-center text-center shadow-2xl">
+           <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 relative overflow-hidden flex flex-col items-center justify-center text-center shadow-2xl">
               <div className="absolute -top-10 -left-10 text-indigo-500/10"><LineIcon size={200} /></div>
-              <div className="absolute -bottom-10 -right-10 text-primary/10"><TrendingUp size={200} /></div>
+              <div className="absolute -bottom-10 -right-10 text-emerald-500/10"><TrendingUp size={200} /></div>
 
-              <span className="text-sm md:text-base text-muted font-semibold tracking-widest uppercase mb-2 relative z-10">Patrimônio Atual Consolidado</span>
-              <h2 className={`text-4xl md:text-6xl font-black relative z-10 tracking-tight ${currentNetWorth >= 0 ? 'text-primary-glow' : 'text-rose-400'}`}>
+              <span className="text-sm md:text-base text-zinc-400 font-semibold tracking-widest uppercase mb-2 relative z-10">Patrimônio Atual Consolidado</span>
+              <h2 className={`text-4xl md:text-6xl font-black relative z-10 tracking-tight ${currentNetWorth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                  {formatCurrency(currentNetWorth)}
               </h2>
            </div>
 
-           <div className="bg-surface/60 border border-border rounded-2xl p-6 h-[400px] md:h-[500px] w-full mt-8">
-              <h3 className="text-lg font-semibold text-content flex items-center gap-2 mb-6">
+           <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 h-[400px] md:h-[500px] w-full mt-8">
+              <h3 className="text-lg font-semibold text-zinc-100 flex items-center gap-2 mb-6">
                  <TrendingUp className="text-indigo-400" size={20} /> Histórico de Crescimento Acumulado
               </h3>
               <div className="h-full w-full pb-8">

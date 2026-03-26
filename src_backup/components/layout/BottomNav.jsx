@@ -17,7 +17,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface/95 backdrop-blur-md border-t border-border z-50 flex overflow-x-auto scrollbar-none snap-x items-center px-2 py-1 safe-area-pb w-full">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 z-50 flex overflow-x-auto scrollbar-none snap-x items-center px-2 py-1 safe-area-pb w-full">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname.startsWith(item.path);
@@ -29,15 +29,15 @@ export default function BottomNav() {
             className={cn(
               "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all w-16 h-14 snap-start flex-shrink-0 relative",
               isActive 
-                ? "text-primary-glow" 
-                : "text-muted hover:text-muted"
+                ? "text-emerald-400" 
+                : "text-zinc-500 hover:text-zinc-300"
             )}
           >
-            <Icon size={isActive ? 22 : 20} className={cn("transition-all", isActive && "stroke-primary-glow")} />
+            <Icon size={isActive ? 22 : 20} className={cn("transition-all", isActive && "stroke-emerald-400")} />
             <span className={cn("text-[10px] font-medium transition-all", isActive && "opacity-100 font-bold")}>
               {item.name}
             </span>
-            {isActive && <div className="absolute top-1 w-8 h-8 bg-primary/10 rounded-full -z-10 blur-sm"></div>}
+            {isActive && <div className="absolute top-1 w-8 h-8 bg-emerald-500/10 rounded-full -z-10 blur-sm"></div>}
           </Link>
         );
       })}

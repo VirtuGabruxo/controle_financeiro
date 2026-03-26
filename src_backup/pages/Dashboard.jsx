@@ -115,21 +115,21 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted mt-1 text-sm md:text-base">Resumo das finanças e histórico</p>
+          <p className="text-zinc-400 mt-1 text-sm md:text-base">Resumo das finanças e histórico</p>
         </div>
         
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 bg-surface/80 border border-border p-2 rounded-xl">
-          <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted hover:text-content transition-colors">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 bg-zinc-900/80 border border-zinc-800 p-2 rounded-xl">
+          <button onClick={goPrevMonth} className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-100 transition-colors">
             <ChevronLeft size={20} />
           </button>
-          <span className="min-w-[120px] md:min-w-[140px] text-center font-medium capitalize text-content text-sm md:text-base">
+          <span className="min-w-[120px] md:min-w-[140px] text-center font-medium capitalize text-zinc-100 text-sm md:text-base">
             {monthName}
           </span>
-          <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted hover:text-content transition-colors">
+          <button onClick={goNextMonth} className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-100 transition-colors">
             <ChevronRight size={20} />
           </button>
-          <div className="hidden sm:block w-px h-6 bg-border mx-1"></div>
-          <button onClick={fetchDashboardData} className="hidden sm:block p-1.5 hover:bg-border rounded-lg text-muted hover:text-content transition-colors" title="Atualizar">
+          <div className="hidden sm:block w-px h-6 bg-zinc-800 mx-1"></div>
+          <button onClick={fetchDashboardData} className="hidden sm:block p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-100 transition-colors" title="Atualizar">
             <RefreshCcw size={18} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
@@ -137,31 +137,31 @@ export default function Dashboard() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Wallet size={80} />
           </div>
-          <p className="text-muted font-medium mb-1 relative z-10 text-sm md:text-base">Saldo Líquido</p>
-          <h2 className={`text-2xl md:text-3xl lg:text-4xl font-bold relative z-10 ${balance >= 0 ? 'text-primary-glow' : 'text-red-400'}`}>
+          <p className="text-zinc-400 font-medium mb-1 relative z-10 text-sm md:text-base">Saldo Líquido</p>
+          <h2 className={`text-2xl md:text-3xl lg:text-4xl font-bold relative z-10 ${balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
              {formatCurrency(balance)}
           </h2>
         </div>
 
-        <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <TrendingUp size={80} />
           </div>
-          <p className="text-muted font-medium mb-1 relative z-10 text-sm md:text-base">Rendas do Mês</p>
+          <p className="text-zinc-400 font-medium mb-1 relative z-10 text-sm md:text-base">Rendas do Mês</p>
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-zinc-50 relative z-10">
              {formatCurrency(totalIncome)}
           </h2>
         </div>
 
-        <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-zinc-700 transition-all">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <TrendingDown size={80} />
           </div>
-          <p className="text-muted font-medium mb-1 relative z-10 text-sm md:text-base">Despesas do Mês</p>
+          <p className="text-zinc-400 font-medium mb-1 relative z-10 text-sm md:text-base">Despesas do Mês</p>
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-rose-400 relative z-10">
              {formatCurrency(totalExpense)}
           </h2>
@@ -169,8 +169,8 @@ export default function Dashboard() {
       </div>
 
       {/* Comparative Chart */}
-      <div className="bg-surface/50 border border-border rounded-2xl p-5 md:p-6 w-full overflow-hidden">
-        <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 flex items-center gap-2 text-content">
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 md:p-6 w-full overflow-hidden">
+        <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 flex items-center gap-2 text-zinc-100">
           <TrendingDown className="text-rose-400" size={20} />
           Evolução de Gastos (Últimos 6 meses)
         </h3>
@@ -201,8 +201,8 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
          {/* Categories Pie Chart */}
-         <div className="bg-surface/50 border border-border rounded-2xl p-5 md:p-6 w-full">
-           <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Despesas por Categoria</h3>
+         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 md:p-6 w-full">
+           <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-zinc-100">Despesas por Categoria</h3>
            {expensesByCategory.length > 0 ? (
              <>
                <div className="h-56 md:h-64">
@@ -230,23 +230,23 @@ export default function Dashboard() {
                </div>
                <div className="flex flex-wrap gap-2 md:gap-4 mt-6 justify-center">
                  {expensesByCategory.map(cat => (
-                   <div key={cat.name} className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted bg-background/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-border">
+                   <div key={cat.name} className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-zinc-300 bg-zinc-950/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-zinc-800">
                      <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full shadow-sm" style={{ backgroundColor: cat.color }} />
-                     {cat.name} <span className="text-muted text-[10px] md:text-xs">({formatCurrency(cat.value)})</span>
+                     {cat.name} <span className="text-zinc-500 text-[10px] md:text-xs">({formatCurrency(cat.value)})</span>
                    </div>
                  ))}
                </div>
              </>
            ) : (
-              <div className="h-48 md:h-64 flex items-center justify-center text-muted border border-dashed border-border/50 rounded-xl text-sm">
+              <div className="h-48 md:h-64 flex items-center justify-center text-zinc-500 border border-dashed border-zinc-800/50 rounded-xl text-sm">
                 Sem despesas neste mês.
               </div>
            )}
          </div>
          
          {/* Intelligent Insights */}
-         <div className="bg-surface/50 border border-border rounded-2xl p-5 md:p-6 w-full">
-            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Insights do Mês</h3>
+         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 md:p-6 w-full">
+            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-zinc-100">Insights do Mês</h3>
             <div className="space-y-3 md:space-y-4">
                {totalExpense > totalIncome && totalIncome > 0 && (
                  <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -256,23 +256,23 @@ export default function Dashboard() {
                )}
                
                {expensesByCategory.length > 0 && (
-                 <div className="p-3 md:p-4 bg-background/50 border border-border rounded-xl">
-                    <p className="text-muted font-medium text-sm md:text-base">💡 Maior Gasto</p>
-                    <p className="text-xs md:text-sm text-muted mt-1">
-                      A categoria <span className="text-content font-bold">{expensesByCategory[0]?.name}</span> representa <span className="text-rose-400 font-bold">{((expensesByCategory[0]?.value / totalExpense) * 100).toFixed(1)}%</span> das suas despesas.
+                 <div className="p-3 md:p-4 bg-zinc-950/50 border border-zinc-800 rounded-xl">
+                    <p className="text-zinc-300 font-medium text-sm md:text-base">💡 Maior Gasto</p>
+                    <p className="text-xs md:text-sm text-zinc-400 mt-1">
+                      A categoria <span className="text-zinc-200 font-bold">{expensesByCategory[0]?.name}</span> representa <span className="text-rose-400 font-bold">{((expensesByCategory[0]?.value / totalExpense) * 100).toFixed(1)}%</span> das suas despesas.
                     </p>
                  </div>
                )}
                
                {balance > 0 && (
-                 <div className="p-3 md:p-4 bg-primary/10 border border-primary/20 rounded-xl">
-                    <p className="text-primary-glow font-medium text-sm md:text-base">🎉 Parabéns!</p>
-                    <p className="text-xs md:text-sm text-primary-glow/80 mt-1">Seu balanço está positivo. Excelente gestão financeira neste mês!</p>
+                 <div className="p-3 md:p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <p className="text-emerald-400 font-medium text-sm md:text-base">🎉 Parabéns!</p>
+                    <p className="text-xs md:text-sm text-emerald-400/80 mt-1">Seu balanço está positivo. Excelente gestão financeira neste mês!</p>
                  </div>
                )}
 
                {totalExpense === 0 && totalIncome === 0 && (
-                 <div className="p-4 text-center text-muted text-sm md:text-base">
+                 <div className="p-4 text-center text-zinc-500 text-sm md:text-base">
                     Nenhuma movimentação registrada.<br className="hidden md:block" />Comece adicionando rendas ou despesas.
                  </div>
                )}

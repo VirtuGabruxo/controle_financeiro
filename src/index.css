@@ -1,7 +1,68 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: var(--bg-main);
+  --color-surface: var(--bg-surface);
+  --color-border: var(--border-line);
+  --color-content: var(--text-main);
+  --color-muted: var(--text-muted);
+  --color-inverse: var(--text-inverse);
+  --color-primary: var(--primary-color);
+  --color-primary-glow: var(--primary-glow-color);
+}
+
 @layer base {
-  body {
-    @apply bg-zinc-950 text-zinc-50 min-h-screen font-sans antialiased;
+  :root {
+    /* Modo Claro (Light Mode) */
+    --bg-main: #f4f4f5; 
+    --bg-surface: #ffffff;
+    --border-line: #e4e4e7;
+    --text-main: #18181b;
+    --text-muted: #71717a;
+    --text-inverse: #ffffff;
+    
+    /* Configuração Padrão Emerald */
+    --primary-color: #10b981;
+    --primary-glow-color: #34d399;
   }
+
+  .dark {
+    /* Modo Escuro (Dark Mode original do app) */
+    --bg-main: #09090b;
+    --bg-surface: #18181b;
+    --border-line: #27272a;
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --text-inverse: #09090b;
+  }
+
+  /* Temas de Cores (Destaques) */
+  :root[data-theme="blue"] {
+    --primary-color: #3b82f6;
+    --primary-glow-color: #60a5fa;
+  }
+  
+  :root[data-theme="purple"] {
+    --primary-color: #a855f7;
+    --primary-glow-color: #c084fc;
+  }
+  
+  :root[data-theme="rose"] {
+    --primary-color: #f43f5e;
+    --primary-glow-color: #fb7185;
+  }
+  
+  :root[data-theme="orange"] {
+    --primary-color: #f97316;
+    --primary-glow-color: #fb923c;
+  }
+  
+  :root[data-theme="emerald"] {
+    --primary-color: #10b981;
+    --primary-glow-color: #34d399;
+  }
+}
+
+body {
+  @apply bg-background text-content transition-colors duration-300;
 }

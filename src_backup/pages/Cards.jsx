@@ -122,7 +122,7 @@ export default function Cards() {
       <div className="flex justify-between items-center sm:items-end">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">Meus Cartões</h1>
-          <p className="text-muted mt-1 text-sm md:text-base">Gestão de limites e consumo real dos seus cartões</p>
+          <p className="text-zinc-400 mt-1 text-sm md:text-base">Gestão de limites e consumo real dos seus cartões</p>
         </div>
         <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-lg text-sm md:text-base">
           <Plus size={18} /> <span className="hidden sm:inline">Cadastrar</span>
@@ -130,47 +130,47 @@ export default function Cards() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center p-12 text-muted gap-2"><Loader2 className="animate-spin" /> Carregando cartões...</div>
+        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2"><Loader2 className="animate-spin" /> Carregando cartões...</div>
       ) : sortedCards.length === 0 ? (
-        <div className="bg-surface/30 border border-border/50 border-dashed rounded-2xl p-12 text-center text-muted flex flex-col items-center">
+        <div className="bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-2xl p-12 text-center text-zinc-500 flex flex-col items-center">
             <CreditCard size={48} className="text-zinc-700 mb-4" />
             <p>Nenhum cartão de crédito cadastrado.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedCards.map(c => (
-            <div key={c.id} className="bg-surface/60 border border-border rounded-2xl p-6 relative overflow-hidden group">
+            <div key={c.id} className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden group">
                <div className="flex justify-between items-start mb-6 relative z-10">
                  <div className="flex flex-col">
                    <div className="flex items-center gap-2">
                      <div className="w-3 h-3 rounded-full shadow-lg" style={{backgroundColor: c.color}}></div>
-                     <h3 className="text-xl font-bold text-content">{c.name}</h3>
+                     <h3 className="text-xl font-bold text-zinc-100">{c.name}</h3>
                    </div>
-                   <p className="text-xs text-muted mt-1">Fecha dia {c.closing_day} • Vence dia {c.due_day}</p>
+                   <p className="text-xs text-zinc-500 mt-1">Fecha dia {c.closing_day} • Vence dia {c.due_day}</p>
                  </div>
-                 <div className="flex items-center gap-1 bg-background/50 rounded-lg p-1 border border-border/50">
-                   <button onClick={() => handleEdit(c)} className="text-muted hover:text-indigo-400 transition-colors p-1.5 rounded-md hover:bg-border"><Edit2 size={16}/></button>
-                   <button onClick={() => handleDelete(c.id)} className="text-muted hover:text-red-400 transition-colors p-1.5 rounded-md hover:bg-border"><Trash2 size={16}/></button>
+                 <div className="flex items-center gap-1 bg-zinc-950/50 rounded-lg p-1 border border-zinc-800/50">
+                   <button onClick={() => handleEdit(c)} className="text-zinc-500 hover:text-indigo-400 transition-colors p-1.5 rounded-md hover:bg-zinc-800"><Edit2 size={16}/></button>
+                   <button onClick={() => handleDelete(c.id)} className="text-zinc-500 hover:text-red-400 transition-colors p-1.5 rounded-md hover:bg-zinc-800"><Trash2 size={16}/></button>
                  </div>
                </div>
 
                <div className="space-y-4 relative z-10">
-                 <div className="bg-background/50 p-4 rounded-xl border border-border/50 flex justify-between items-center">
-                    <span className="text-sm font-medium text-muted">Fatura Atual (Mês)</span>
-                    <span className="text-lg font-bold text-content">{formatCurrency(c.currentInvoice)}</span>
+                 <div className="bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50 flex justify-between items-center">
+                    <span className="text-sm font-medium text-zinc-400">Fatura Atual (Mês)</span>
+                    <span className="text-lg font-bold text-zinc-100">{formatCurrency(c.currentInvoice)}</span>
                  </div>
 
                  <div className="pt-2">
                    <div className="flex justify-between text-xs mb-1.5 font-medium">
-                     <span className={c.consumedPct > 80 ? "text-red-400" : "text-muted"}>Limite Comprometido (Todas Faturas)</span>
-                     <span className="text-content">{c.consumedPct > 100 ? '>100' : c.consumedPct.toFixed(0)}%</span>
+                     <span className={c.consumedPct > 80 ? "text-red-400" : "text-zinc-400"}>Limite Comprometido (Todas Faturas)</span>
+                     <span className="text-zinc-100">{c.consumedPct > 100 ? '>100' : c.consumedPct.toFixed(0)}%</span>
                    </div>
-                   <div className="w-full bg-background rounded-full h-2.5 overflow-hidden">
+                   <div className="w-full bg-zinc-950 rounded-full h-2.5 overflow-hidden">
                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(c.consumedPct, 100)}%`, backgroundColor: c.consumedPct > 80 ? '#f87171' : c.color }}></div>
                    </div>
                    <div className="flex justify-between text-[11px] mt-1.5 font-medium">
                      <span className="text-indigo-400">Disponível: {formatCurrency(c.available)}</span>
-                     <span className="text-muted">Total: {formatCurrency(c.credit_limit)}</span>
+                     <span className="text-zinc-500">Total: {formatCurrency(c.credit_limit)}</span>
                    </div>
                  </div>
                </div>
@@ -185,41 +185,41 @@ export default function Cards() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-content">{editingCardId ? 'Editar Cartão' : 'Registrar Cartão'}</h3>
-                <button onClick={closeModal} className="text-muted hover:text-content"><X size={20}/></button>
+                <h3 className="text-xl font-bold text-zinc-100">{editingCardId ? 'Editar Cartão' : 'Registrar Cartão'}</h3>
+                <button onClick={closeModal} className="text-zinc-500 hover:text-zinc-200"><X size={20}/></button>
              </div>
              
              <form onSubmit={handleCardSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                    <div className="col-span-2 space-y-1">
-                     <label className="text-xs text-muted">Nome do Cartão (Instituição)</label>
-                     <input type="text" placeholder="Ex: Nubank, Itaú..." value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                     <label className="text-xs text-zinc-400">Nome do Cartão (Instituição)</label>
+                     <input type="text" placeholder="Ex: Nubank, Itaú..." value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                    </div>
                    
                    <div className="flex flex-col gap-1 col-span-2">
-                     <label className="text-xs text-muted">Cor Identificadora</label>
-                     <div className="flex items-center gap-3 bg-background/50 p-2 border border-border rounded-lg">
+                     <label className="text-xs text-zinc-400">Cor Identificadora</label>
+                     <div className="flex items-center gap-3 bg-zinc-950/50 p-2 border border-zinc-800 rounded-lg">
                        <input type="color" value={cardForm.color} onChange={e=>setCardForm({...cardForm, color: e.target.value})} className="w-8 h-8 rounded border-none cursor-pointer p-0" />
-                       <span className="text-xs text-muted uppercase">{cardForm.color}</span>
+                       <span className="text-xs text-zinc-500 uppercase">{cardForm.color}</span>
                      </div>
                    </div>
                    
                    <div className="space-y-1">
-                     <label className="text-xs text-muted">Dia do Vencimento</label>
-                     <input type="number" min="1" max="31" value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                     <label className="text-xs text-zinc-400">Dia do Vencimento</label>
+                     <input type="number" min="1" max="31" value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-xs text-muted">Dia do Fechamento</label>
-                     <input type="number" min="1" max="31" value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                     <label className="text-xs text-zinc-400">Dia do Fechamento</label>
+                     <input type="number" min="1" max="31" value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                    </div>
 
                    <div className="col-span-2 space-y-1 pt-2">
-                     <label className="text-xs text-muted font-bold text-indigo-400">Limite de Crédito Totalizado</label>
-                     <div className="relative flex items-center bg-background/50 border border-border rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition-all">
-                       <span className="pl-4 text-muted text-sm">R$</span>
-                       <input type="number" step="0.01" min="0" placeholder="0.00" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-3 py-3 text-sm text-content focus:outline-none" />
+                     <label className="text-xs text-zinc-400 font-bold text-indigo-400">Limite de Crédito Totalizado</label>
+                     <div className="relative flex items-center bg-zinc-950/50 border border-zinc-800 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition-all">
+                       <span className="pl-4 text-zinc-500 text-sm">R$</span>
+                       <input type="number" step="0.01" min="0" placeholder="0.00" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-3 py-3 text-sm text-zinc-100 focus:outline-none" />
                      </div>
                    </div>
                 </div>

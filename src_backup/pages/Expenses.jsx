@@ -213,17 +213,17 @@ export default function Expenses() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent">Minhas Despesas</h1>
-          <p className="text-muted mt-1 text-sm md:text-base">Gerencie cartões e pague suas faturas</p>
+          <p className="text-zinc-400 mt-1 text-sm md:text-base">Gerencie cartões e pague suas faturas</p>
         </div>
         
-        <div className="flex items-center justify-between sm:justify-end gap-2 bg-surface/80 border border-border p-2 rounded-xl">
-          <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors">
+        <div className="flex items-center justify-between sm:justify-end gap-2 bg-zinc-900/80 border border-zinc-800 p-2 rounded-xl">
+          <button onClick={goPrevMonth} className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors">
             <ChevronLeft size={20} />
           </button>
-          <span className="min-w-[140px] text-center font-bold capitalize text-content text-sm md:text-base">
+          <span className="min-w-[140px] text-center font-bold capitalize text-zinc-100 text-sm md:text-base">
             {monthName}
           </span>
-          <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors">
+          <button onClick={goNextMonth} className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors">
             <ChevronRight size={20} />
           </button>
         </div>
@@ -231,31 +231,31 @@ export default function Expenses() {
 
       {/* Mini-Dashboard Faturas */}
       <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
-         <div className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
+         <div className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-muted text-sm flex items-center gap-2"><Wallet size={16}/> Débito / Pix</span>
+              <span className="text-zinc-400 text-sm flex items-center gap-2"><Wallet size={16}/> Débito / Pix</span>
             </div>
-            <h2 className="text-2xl font-bold text-content">{formatCurrency(debitTotal)}</h2>
+            <h2 className="text-2xl font-bold text-zinc-100">{formatCurrency(debitTotal)}</h2>
          </div>
 
          {invoices.map(c => (
-           <div key={c.id} className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[260px] flex-shrink-0 snap-start relative overflow-hidden">
+           <div key={c.id} className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-2xl min-w-[260px] flex-shrink-0 snap-start relative overflow-hidden">
              <div className="flex justify-between items-center mb-1 relative z-10">
-               <span className="text-muted font-medium text-sm flex items-center gap-2">
+               <span className="text-zinc-300 font-medium text-sm flex items-center gap-2">
                  <div className="w-3 h-3 rounded-full" style={{backgroundColor: c.color}}></div>
                  Fatura {c.name}
                </span>
-               <span className="text-[10px] text-muted font-medium">Vence dia {c.due_day}</span>
+               <span className="text-[10px] text-zinc-500 font-medium">Vence dia {c.due_day}</span>
              </div>
-             <h2 className="text-2xl font-bold text-content mb-3 relative z-10">{formatCurrency(c.invoiceTotal)}</h2>
+             <h2 className="text-2xl font-bold text-zinc-100 mb-3 relative z-10">{formatCurrency(c.invoiceTotal)}</h2>
              
              {/* Progress Limit Bar */}
              <div className="relative z-10">
-               <div className="flex justify-between text-[10px] text-muted mb-1">
+               <div className="flex justify-between text-[10px] text-zinc-500 mb-1">
                  <span>Limite Comprometido</span>
                  <span>{formatCurrency(c.credit_limit || 0)}</span>
                </div>
-               <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
+               <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden">
                  <div className="h-full rounded-full transition-all" style={{ width: `${c.pct}%`, backgroundColor: c.color }}></div>
                </div>
              </div>
@@ -270,42 +270,42 @@ export default function Expenses() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
         {/* Formulário Desktop Sidebar */}
-        <div className="lg:col-span-1 bg-surface border border-border rounded-2xl p-5 md:p-6 relative lg:sticky lg:top-6 z-10 h-fit">
+        <div className="lg:col-span-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 md:p-6 relative lg:sticky lg:top-6 z-10 h-fit">
           <div className="flex justify-between items-center mb-6">
-             <h2 className="text-lg md:text-xl font-semibold text-content flex items-center gap-2">
+             <h2 className="text-lg md:text-xl font-semibold text-zinc-100 flex items-center gap-2">
                <Plus className="text-rose-400" /> {editingId ? 'Editar Despesa' : 'Novo Gasto'}
              </h2>
              {editingId && (
-               <button type="button" onClick={handleCancelEdit} className="text-xs text-muted hover:text-muted">Cancelar</button>
+               <button type="button" onClick={handleCancelEdit} className="text-xs text-zinc-500 hover:text-zinc-300">Cancelar</button>
              )}
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted">Descrição</label>
-              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Mercado" required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
+              <label className="text-sm font-medium text-zinc-300">Descrição</label>
+              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Mercado" required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">Valor</label>
-                <div className="relative flex items-center bg-background/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-rose-500/50">
-                  <span className="pl-3 text-muted text-sm">R$</span>
-                  <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-transparent px-2 py-2.5 text-content focus:outline-none text-sm md:text-base" />
+                <label className="text-sm font-medium text-zinc-300">Valor</label>
+                <div className="relative flex items-center bg-zinc-950/50 border border-zinc-800 rounded-xl focus-within:ring-2 focus-within:ring-rose-500/50">
+                  <span className="pl-3 text-zinc-500 text-sm">R$</span>
+                  <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-transparent px-2 py-2.5 text-zinc-100 focus:outline-none text-sm md:text-base" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">Data</label>
-                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm text-center" />
+                <label className="text-sm font-medium text-zinc-300">Data</label>
+                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-3 py-[9px] text-zinc-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm text-center" />
               </div>
             </div>
 
             <div className="space-y-1.5">
                <div className="flex justify-between items-center">
-                 <label className="text-sm font-medium text-muted">Forma de Pag. / Cartão</label>
-                 <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-primary-glow hover:text-emerald-300 flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>
+                 <label className="text-sm font-medium text-zinc-300">Forma de Pag. / Cartão</label>
+                 <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>
                </div>
-               <select value={cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
+               <select value={cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
                  <option value="debit">Débito / Dinheiro / Pix</option>
                  {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}</option>)}
                </select>
@@ -313,24 +313,24 @@ export default function Expenses() {
 
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-1.5">
-                 <label className="text-sm font-medium text-muted">Categoria</label>
-                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
+                 <label className="text-sm font-medium text-zinc-300">Categoria</label>
+                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
                    <option value="">Selecione...</option>
                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                  </select>
                </div>
                <div className="space-y-1.5">
-                 <label className="text-sm font-medium text-muted">Nº Parcelas</label>
-                 <input type="number" min="1" max="60" disabled={editingId || isRecurring} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
+                 <label className="text-sm font-medium text-zinc-300">Nº Parcelas</label>
+                 <input type="number" min="1" max="60" disabled={editingId || isRecurring} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl px-3 py-2.5 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
                </div>
             </div>
 
             <div className="pt-2">
-              <label className="flex items-center gap-3 cursor-pointer p-3 bg-background/30 border border-border/80 rounded-xl">
-                <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} disabled={editingId} className="w-4 h-4 rounded border-zinc-700 bg-surface text-rose-500 focus:ring-rose-500 focus:ring-offset-zinc-950 disabled:opacity-50" />
+              <label className="flex items-center gap-3 cursor-pointer p-3 bg-zinc-950/30 border border-zinc-800/80 rounded-xl">
+                <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} disabled={editingId} className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-rose-500 focus:ring-rose-500 focus:ring-offset-zinc-950 disabled:opacity-50" />
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-content">Despesa Fixa (Assinatura)</span>
-                  <span className="text-[10px] text-muted">Repete o valor todo mês indefinidamente.</span>
+                  <span className="text-sm font-medium text-zinc-200">Despesa Fixa (Assinatura)</span>
+                  <span className="text-[10px] text-zinc-500">Repete o valor todo mês indefinidamente.</span>
                 </div>
               </label>
             </div>
@@ -348,17 +348,17 @@ export default function Expenses() {
            
            {/* Filtros de Tab */}
            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x">
-             <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-zinc-100 text-inverse" : "bg-surface/80 text-muted hover:bg-border")}>Todas</button>
-             <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-surface/80 text-muted hover:bg-border")}>Débito/Dinheiro</button>
+             <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-zinc-800", activeTab === 'all' ? "bg-zinc-100 text-zinc-900" : "bg-zinc-900/80 text-zinc-400 hover:bg-zinc-800")}>Todas</button>
+             <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-zinc-800", activeTab === 'debit' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50" : "bg-zinc-900/80 text-zinc-400 hover:bg-zinc-800")}>Débito/Dinheiro</button>
              {cards.map(c => (
-               <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : '#27272a', color: activeTab === c.id ? c.color : '#a1a1aa' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-surface/80 hover:bg-border transition-all")}>{c.name}</button>
+               <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : '#27272a', color: activeTab === c.id ? c.color : '#a1a1aa' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-zinc-900/80 hover:bg-zinc-800 transition-all")}>{c.name}</button>
              ))}
            </div>
 
           {loading ? (
-             <div className="text-muted flex items-center gap-2"><Loader2 className="animate-spin" /> Carregando...</div>
+             <div className="text-zinc-400 flex items-center gap-2"><Loader2 className="animate-spin" /> Carregando...</div>
           ) : filteredList.length === 0 ? (
-             <div className="bg-surface/30 border border-border/50 border-dashed rounded-2xl p-8 md:p-12 text-center text-muted flex flex-col items-center">
+             <div className="bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-2xl p-8 md:p-12 text-center text-zinc-500 flex flex-col items-center">
                 <p>Nenhuma despesa correspondente encontrada neste mês.</p>
              </div>
           ) : (
@@ -369,14 +369,14 @@ export default function Expenses() {
                  
                  return (
                    <div key={exp.id} className={cn(
-                     "bg-surface/40 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-surface",
-                     isPaid ? "border-primary/30 opacity-75" : "border-border/80",
+                     "bg-zinc-900/40 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-zinc-900",
+                     isPaid ? "border-emerald-500/30 opacity-75" : "border-zinc-800/80",
                      editingId === exp.id && "border-rose-500/50 ring-1 ring-rose-500/50"
                    )}>
                      
                      <div className="flex items-center gap-4 flex-1">
                        <button onClick={() => toggleStatus(exp)} className="p-1 -m-1 transition-colors flex-shrink-0" title={isPaid ? "Ativar como Pendente" : "Marcar como Pago"}>
-                         {isPaid ? <CheckCircle2 className="text-primary" size={24} /> : <Circle className="text-zinc-600 hover:text-primary-glow" size={24} />}
+                         {isPaid ? <CheckCircle2 className="text-emerald-500" size={24} /> : <Circle className="text-zinc-600 hover:text-emerald-400" size={24} />}
                        </button>
                        
                        <div className="min-w-0">
@@ -386,25 +386,25 @@ export default function Expenses() {
                                💳 {card.name}
                              </span>
                            ) : (
-                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-primary/10 text-primary-glow border border-primary/30">Débito</span>
+                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Débito</span>
                            )}
                            {exp.is_recurring && <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold text-center">Fixa</span>}
                          </div>
-                         <p className={cn("font-medium text-sm md:text-base text-content truncate", isPaid && "line-through text-muted")}>{exp.description}</p>
-                         <p className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                         <p className={cn("font-medium text-sm md:text-base text-zinc-100 truncate", isPaid && "line-through text-zinc-400")}>{exp.description}</p>
+                         <p className="text-xs text-zinc-500 mt-0.5 flex items-center gap-2">
                             {new Date(exp.expense_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
                             {exp.categories && <><span className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: exp.categories.color}}></span> {exp.categories.name}</>}
                          </p>
                        </div>
                      </div>
 
-                     <div className="flex items-center justify-between sm:justify-end gap-4 border-t border-border/50 sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                     <div className="flex items-center justify-between sm:justify-end gap-4 border-t border-zinc-800/50 sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
                        <div className="text-left sm:text-right flex flex-col items-start sm:items-end flex-shrink-0">
-                         <span className={cn("text-lg md:text-xl font-bold transition-colors", isPaid ? "text-primary" : "text-rose-400")}>{formatCurrency(exp.amount)}</span>
+                         <span className={cn("text-lg md:text-xl font-bold transition-colors", isPaid ? "text-emerald-500" : "text-rose-400")}>{formatCurrency(exp.amount)}</span>
                        </div>
                        <div className="flex items-center gap-1 flex-shrink-0">
-                         <button onClick={() => handleEdit(exp)} className="text-muted hover:text-muted p-2 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
-                         <button onClick={() => handleDelete(exp.id)} className="text-muted hover:text-red-400 p-2 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                         <button onClick={() => handleEdit(exp)} className="text-zinc-500 hover:text-zinc-300 p-2 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                         <button onClick={() => handleDelete(exp.id)} className="text-zinc-500 hover:text-red-400 p-2 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
                        </div>
                      </div>
                    </div>
@@ -418,21 +418,21 @@ export default function Expenses() {
       {/* Modal de Gestão de Cartões */}
       {showCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold bg-gradient-to-r from-primary-glow to-cyan-400 bg-clip-text text-transparent">Meus Cartões</h3>
-                <button onClick={() => setShowCardModal(false)} className="text-muted hover:text-content"><X size={20}/></button>
+                <h3 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Meus Cartões</h3>
+                <button onClick={() => setShowCardModal(false)} className="text-zinc-500 hover:text-zinc-200"><X size={20}/></button>
              </div>
              
              <div className="space-y-4 mb-6 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-               {cards.length === 0 ? <p className="text-xs text-center text-muted">Nenhum cartão cadastrado ainda.</p> : 
+               {cards.length === 0 ? <p className="text-xs text-center text-zinc-500">Nenhum cartão cadastrado ainda.</p> : 
                  cards.map(c => (
-                   <div key={c.id} className="flex justify-between items-center p-3 border border-border rounded-xl bg-background/50">
+                   <div key={c.id} className="flex justify-between items-center p-3 border border-zinc-800 rounded-xl bg-zinc-950/50">
                      <div className="flex items-center gap-3">
                        <span className="w-4 h-4 rounded-full" style={{backgroundColor: c.color}}></span>
                        <div>
-                         <p className="text-sm font-semibold text-content">{c.name}</p>
-                         <p className="text-[10px] text-muted">Lim: {formatCurrency(c.credit_limit)} | Fecha: {c.closing_day}</p>
+                         <p className="text-sm font-semibold text-zinc-200">{c.name}</p>
+                         <p className="text-[10px] text-zinc-500">Lim: {formatCurrency(c.credit_limit)} | Fecha: {c.closing_day}</p>
                        </div>
                      </div>
                      <button onClick={async () => { if(window.confirm('Excluir este cartão? Moverá despesas dele para Débito.')) { await supabase.from('cards').delete().eq('id', c.id); fetchCoreData(); } }} className="text-red-400/50 hover:text-red-400"><Trash2 size={16}/></button>
@@ -441,33 +441,33 @@ export default function Expenses() {
                }
              </div>
              
-             <form onSubmit={handleCardSubmit} className="space-y-4 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-muted">Novo Cartão</h4>
+             <form onSubmit={handleCardSubmit} className="space-y-4 border-t border-zinc-800 pt-4">
+                <h4 className="text-sm font-semibold text-zinc-300">Novo Cartão</h4>
                 <div className="grid grid-cols-2 gap-3">
-                   <input type="text" placeholder="Nome do Cartão" value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="col-span-2 bg-background/50 border border-border rounded-lg px-3 py-2 text-sm text-content" />
+                   <input type="text" placeholder="Nome do Cartão" value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="col-span-2 bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100" />
                    
                    <div className="flex items-center gap-2 col-span-2">
-                     <span className="text-xs text-muted whitespace-nowrap">Cor visual: </span>
+                     <span className="text-xs text-zinc-400 whitespace-nowrap">Cor visual: </span>
                      <input type="color" value={cardForm.color} onChange={e=>setCardForm({...cardForm, color: e.target.value})} className="w-10 h-8 rounded border-none bg-transparent cursor-pointer" />
                    </div>
                    
                    <div className="space-y-1">
-                     <label className="text-[10px] text-muted">Dia Vencimento</label>
-                     <input type="number" min="1" max="31" value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
+                     <label className="text-[10px] text-zinc-500">Dia Vencimento</label>
+                     <input type="number" min="1" max="31" value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-2 py-2 text-sm text-zinc-100" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[10px] text-muted">Dia Fechamento</label>
-                     <input type="number" min="1" max="31" value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
+                     <label className="text-[10px] text-zinc-500">Dia Fechamento</label>
+                     <input type="number" min="1" max="31" value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-2 py-2 text-sm text-zinc-100" />
                    </div>
                    <div className="col-span-2 space-y-1">
-                     <label className="text-[10px] text-muted">Limite Total (Opcional)</label>
-                     <div className="relative flex items-center bg-background/50 border border-border rounded-lg focus-within:ring-1 focus-within:ring-primary/50">
-                       <span className="pl-3 text-muted text-xs">R$</span>
-                       <input type="number" step="0.01" min="0" placeholder="0.00" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-2 py-2 text-sm text-content focus:outline-none" />
+                     <label className="text-[10px] text-zinc-500">Limite Total (Opcional)</label>
+                     <div className="relative flex items-center bg-zinc-950/50 border border-zinc-800 rounded-lg focus-within:ring-1 focus-within:ring-emerald-500/50">
+                       <span className="pl-3 text-zinc-500 text-xs">R$</span>
+                       <input type="number" step="0.01" min="0" placeholder="0.00" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-2 py-2 text-sm text-zinc-100 focus:outline-none" />
                      </div>
                    </div>
                 </div>
-                <button type="submit" disabled={isSubmittingCard} className="w-full py-2 bg-primary hover:bg-primary-glow text-inverse font-bold rounded-lg text-sm mt-2 transition-colors">
+                <button type="submit" disabled={isSubmittingCard} className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-900 font-bold rounded-lg text-sm mt-2 transition-colors">
                   {isSubmittingCard ? 'Salvando...' : 'Cadastrar Cartão'}
                 </button>
              </form>

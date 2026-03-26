@@ -18,9 +18,9 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-surface border-r border-border flex-shrink-0 relative">
+    <aside className="hidden md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 flex-shrink-0 relative">
       <div className="p-6">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary-glow to-cyan-400 bg-clip-text text-transparent">
+        <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
           FinControl
         </h1>
       </div>
@@ -37,8 +37,8 @@ export default function Sidebar() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
                 isActive 
-                  ? "bg-border text-primary-glow" 
-                  : "text-muted hover:text-content hover:bg-border/50"
+                  ? "bg-zinc-800 text-emerald-400" 
+                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
               )}
             >
               <Icon size={20} />
@@ -54,8 +54,8 @@ export default function Sidebar() {
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
             location.pathname.startsWith('/settings') 
-              ? "bg-border text-primary-glow" 
-              : "text-muted hover:text-content hover:bg-border/50"
+              ? "bg-zinc-800 text-emerald-400" 
+              : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
           )}
         >
           <SettingsIcon size={20} />
@@ -63,17 +63,17 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      <div className="p-4 border-t border-border flex items-center justify-between gap-2">
+      <div className="p-4 border-t border-zinc-800 flex items-center justify-between gap-2">
         <button 
           onClick={() => setShowBalances(!showBalances)}
-          className="flex items-center justify-center p-2 text-muted hover:text-primary-glow transition-colors rounded-lg hover:bg-border/50"
+          className="flex items-center justify-center p-2 text-zinc-400 hover:text-emerald-400 transition-colors rounded-lg hover:bg-zinc-800/50"
           title={showBalances ? "Ocultar Valores" : "Mostrar Valores"}
         >
           {showBalances ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
         <button 
           onClick={() => signOut()}
-          className="flex flex-1 items-center justify-center gap-2 p-2 text-muted hover:text-red-400 transition-colors rounded-lg hover:bg-border/50"
+          className="flex flex-1 items-center justify-center gap-2 p-2 text-zinc-400 hover:text-red-400 transition-colors rounded-lg hover:bg-zinc-800/50"
           title="Sair"
         >
           <LogOut size={20} />

@@ -181,14 +181,14 @@ export default function Reports() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Construtor de Relatórios</h1>
-          <p className="text-muted mt-1 text-sm md:text-base">Análises dinâmicas e flexíveis dos seus registros</p>
+          <p className="text-zinc-400 mt-1 text-sm md:text-base">Análises dinâmicas e flexíveis dos seus registros</p>
         </div>
         
         {/* Toggle Charts */}
-        <div className="flex bg-surface border border-border p-1.5 rounded-xl self-start">
-           <button onClick={() => setChartType('pie')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='pie'?"bg-border text-cyan-400":"text-muted hover:text-muted")} title="Distribuição"><PieIcon size={20}/></button>
-           <button onClick={() => setChartType('bar')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='bar'?"bg-border text-primary-glow":"text-muted hover:text-muted")} title="Barras (Evolução)"><BarChart3 size={20}/></button>
-           <button onClick={() => setChartType('line')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='line'?"bg-border text-indigo-400":"text-muted hover:text-muted")} title="Linhas (Tendência)"><LineIcon size={20}/></button>
+        <div className="flex bg-zinc-900 border border-zinc-800 p-1.5 rounded-xl self-start">
+           <button onClick={() => setChartType('pie')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='pie'?"bg-zinc-800 text-cyan-400":"text-zinc-500 hover:text-zinc-300")} title="Distribuição"><PieIcon size={20}/></button>
+           <button onClick={() => setChartType('bar')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='bar'?"bg-zinc-800 text-emerald-400":"text-zinc-500 hover:text-zinc-300")} title="Barras (Evolução)"><BarChart3 size={20}/></button>
+           <button onClick={() => setChartType('line')} className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", chartType==='line'?"bg-zinc-800 text-indigo-400":"text-zinc-500 hover:text-zinc-300")} title="Linhas (Tendência)"><LineIcon size={20}/></button>
         </div>
       </div>
 
@@ -196,21 +196,21 @@ export default function Reports() {
         
         {/* Painel de Filtros e Atalhos */}
         <div className="space-y-6">
-           <div className="bg-surface/80 border border-border rounded-2xl p-5">
-             <h3 className="text-content font-semibold flex items-center gap-2 mb-4"><Filter size={18} className="text-cyan-400"/> Filtros Dinâmicos</h3>
+           <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+             <h3 className="text-zinc-100 font-semibold flex items-center gap-2 mb-4"><Filter size={18} className="text-cyan-400"/> Filtros Dinâmicos</h3>
              
              <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted font-medium">Período (Início e Fim)</label>
+                  <label className="text-xs text-zinc-400 font-medium">Período (Início e Fim)</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-content text-xs focus:ring-1 focus:ring-cyan-500" />
-                    <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-content text-xs focus:ring-1 focus:ring-cyan-500" />
+                    <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-100 text-xs focus:ring-1 focus:ring-cyan-500" />
+                    <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-100 text-xs focus:ring-1 focus:ring-cyan-500" />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted font-medium">Movimentação</label>
-                  <select value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-content text-sm focus:ring-1 focus:ring-cyan-500">
+                  <label className="text-xs text-zinc-400 font-medium">Movimentação</label>
+                  <select value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-zinc-100 text-sm focus:ring-1 focus:ring-cyan-500">
                      <option value="both">Fluxo de Caixa (Ambos)</option>
                      <option value="expenses">Apenas Despesas</option>
                      <option value="incomes">Apenas Receitas</option>
@@ -220,16 +220,16 @@ export default function Reports() {
                 {filters.type !== 'incomes' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="text-xs text-muted font-medium">Categoria Específica</label>
-                      <select value={filters.categoryId} onChange={e => setFilters({...filters, categoryId: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-content text-sm focus:ring-1 focus:ring-cyan-500">
+                      <label className="text-xs text-zinc-400 font-medium">Categoria Específica</label>
+                      <select value={filters.categoryId} onChange={e => setFilters({...filters, categoryId: e.target.value})} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-zinc-100 text-sm focus:ring-1 focus:ring-cyan-500">
                          <option value="all">Todas as Categorias</option>
                          {categoriesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs text-muted font-medium">Forma de Pag. (Cartão/Conta)</label>
-                      <select value={filters.cardId} onChange={e => setFilters({...filters, cardId: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-content text-sm focus:ring-1 focus:ring-cyan-500">
+                      <label className="text-xs text-zinc-400 font-medium">Forma de Pag. (Cartão/Conta)</label>
+                      <select value={filters.cardId} onChange={e => setFilters({...filters, cardId: e.target.value})} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 py-2.5 text-zinc-100 text-sm focus:ring-1 focus:ring-cyan-500">
                          <option value="all">Todas</option>
                          <option value="debit">Apenas Débito/Pix</option>
                          {cardsList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -240,9 +240,9 @@ export default function Reports() {
              </div>
              
              {/* Save Box */}
-             <div className="mt-6 pt-5 border-t border-border/80">
+             <div className="mt-6 pt-5 border-t border-zinc-800/80">
                 <div className="flex gap-2">
-                  <input type="text" placeholder="Nomeie este filtro..." value={reportName} onChange={e=>setReportName(e.target.value)} className="w-full bg-background/50 border border-border rounded-lg px-3 text-xs text-content focus:outline-none" />
+                  <input type="text" placeholder="Nomeie este filtro..." value={reportName} onChange={e=>setReportName(e.target.value)} className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-3 text-xs text-zinc-100 focus:outline-none" />
                   <button onClick={handleSaveReport} className="bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 px-3 py-2 rounded-lg transition-colors flex items-center justify-center shrink-0">
                     <Save size={16} />
                   </button>
@@ -252,12 +252,12 @@ export default function Reports() {
 
            {/* Saved Reports List */}
            {savedReports.length > 0 && (
-             <div className="bg-surface/80 border border-border rounded-2xl p-5">
-               <h3 className="text-content font-semibold flex items-center gap-2 mb-3"><Bookmark size={18} className="text-rose-400"/> Salvos</h3>
+             <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+               <h3 className="text-zinc-100 font-semibold flex items-center gap-2 mb-3"><Bookmark size={18} className="text-rose-400"/> Salvos</h3>
                <div className="space-y-2">
                  {savedReports.map(r => (
-                   <div key={r.id} className="flex justify-between items-center bg-background/50 p-2.5 rounded-lg border border-border/50 group">
-                      <button onClick={()=>handleLoadReport(r)} className="text-left flex-1 text-sm text-muted font-medium truncate group-hover:text-cyan-400 transition-colors">
+                   <div key={r.id} className="flex justify-between items-center bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/50 group">
+                      <button onClick={()=>handleLoadReport(r)} className="text-left flex-1 text-sm text-zinc-300 font-medium truncate group-hover:text-cyan-400 transition-colors">
                          {r.name}
                       </button>
                       <button onClick={()=>handleDeleteReport(r.id)} className="text-zinc-600 hover:text-red-400 p-1"><Trash2 size={14}/></button>
@@ -270,12 +270,12 @@ export default function Reports() {
 
         {/* Visão de Dados */}
         <div className="lg:col-span-3 space-y-6">
-           <div className="bg-surface/60 border border-border rounded-2xl p-6 min-h-[400px] flex flex-col">
+           <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 min-h-[400px] flex flex-col">
              
              {loading ? (
-               <div className="flex-1 flex justify-center items-center text-muted gap-2"><Loader2 className="animate-spin" /> Processando dados...</div>
+               <div className="flex-1 flex justify-center items-center text-zinc-500 gap-2"><Loader2 className="animate-spin" /> Processando dados...</div>
              ) : (expenses.length===0 && incomes.length===0) ? (
-               <div className="flex-1 flex justify-center items-center text-muted border border-dashed border-border/80 rounded-xl bg-surface/20">
+               <div className="flex-1 flex justify-center items-center text-zinc-500 border border-dashed border-zinc-800/80 rounded-xl bg-zinc-900/20">
                  Nenhum dado encontrado para os filtros selecionados.
                </div>
              ) : (
@@ -315,19 +315,19 @@ export default function Reports() {
 
                  {/* Sumário Inferior para Gráfico de Pizza (Legend Customizada) */}
                  {chartType === 'pie' && chartData.length > 0 && (
-                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
+                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-zinc-800">
                      {chartData.map(c => {
                        const pct = totalSum > 0 ? ((c.value / totalSum) * 100).toFixed(1) : 0;
                        return (
-                         <div key={c.name} className="flex flex-col border border-border/50 bg-background/30 p-3 rounded-xl">
+                         <div key={c.name} className="flex flex-col border border-zinc-800/50 bg-zinc-950/30 p-3 rounded-xl">
                            <div className="flex justify-between items-start mb-1">
                              <div className="flex items-center gap-2">
                                <span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></span>
-                               <span className="text-xs text-muted font-medium truncate block max-w-[80px]">{c.name}</span>
+                               <span className="text-xs text-zinc-400 font-medium truncate block max-w-[80px]">{c.name}</span>
                              </div>
-                             <span className="text-[10px] text-muted font-bold">{pct}%</span>
+                             <span className="text-[10px] text-zinc-500 font-bold">{pct}%</span>
                            </div>
-                           <span className="text-sm font-bold text-content">{formatCurrency(c.value)}</span>
+                           <span className="text-sm font-bold text-zinc-100">{formatCurrency(c.value)}</span>
                          </div>
                        )
                      })}
@@ -339,24 +339,24 @@ export default function Reports() {
 
            {/* Top 5 (Aparece primariamente quando se olha para Despesas Específicas) */}
            {filters.type !== 'incomes' && expenses.length > 0 && (
-             <div className="bg-surface/60 border border-border rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-content flex items-center gap-2 mb-6">
+             <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-zinc-100 flex items-center gap-2 mb-6">
                   <ListOrdered className="text-rose-400" size={20} /> Top 5 Recortes (Despesas Isoladas)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {topExpenses.map((exp, idx) => {
                     const cColor = exp.categories?.color || '#a1a1aa';
                     return (
-                      <div key={exp.id} className="flex flex-col p-4 bg-background/60 border border-border/80 rounded-xl hover:bg-surface transition-colors">
+                      <div key={exp.id} className="flex flex-col p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-xl hover:bg-zinc-900 transition-colors">
                         <div className="flex items-center justify-between mb-2">
-                          <span className={cn("text-lg font-black italic opacity-50", idx===0 ? "text-amber-400" : idx===1 ? "text-muted" : idx===2 ? "text-amber-700" : "text-zinc-700")}>
+                          <span className={cn("text-lg font-black italic opacity-50", idx===0 ? "text-amber-400" : idx===1 ? "text-zinc-400" : idx===2 ? "text-amber-700" : "text-zinc-700")}>
                             #{idx+1}
                           </span>
-                          <span className="text-[10px] bg-surface px-2 py-0.5 rounded-md border border-border text-muted" style={{color: cColor, borderColor: `${cColor}50`}}>{exp.categories?.name || 'Geral'}</span>
+                          <span className="text-[10px] bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-800 text-zinc-400" style={{color: cColor, borderColor: `${cColor}50`}}>{exp.categories?.name || 'Geral'}</span>
                         </div>
-                        <p className="font-semibold text-content truncate flex-1 block">{exp.description}</p>
+                        <p className="font-semibold text-zinc-100 truncate flex-1 block">{exp.description}</p>
                         <div className="flex justify-between items-end mt-2">
-                          <p className="text-[10px] text-muted">{new Date(exp.expense_date).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
+                          <p className="text-[10px] text-zinc-500">{new Date(exp.expense_date).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
                           <p className="text-base font-bold text-rose-400">{formatCurrency(exp.amount)}</p>
                         </div>
                       </div>
