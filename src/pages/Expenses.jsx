@@ -40,7 +40,7 @@ export default function Expenses() {
   useEffect(() => { fetchExpenses(); }, [user, currentMonth]);
 
   const fetchCoreData = async () => {
-    const { data: catData } = await supabase.from('categories').select('*').order('name');
+    const { data: catData } = await supabase.from('categories').select('*').or(`user_id.eq.${user.id},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
     const { data: cardData } = await supabase.from('cards').select('*').order('name');
     if (cardData) setCards(cardData);

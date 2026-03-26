@@ -47,7 +47,7 @@ export default function Reports() {
   }, [user, filters]);
 
   const fetchOptions = async () => {
-    const { data: cat } = await supabase.from('categories').select('id, name');
+    const { data: cat } = await supabase.from('categories').select('id, name').or(`user_id.eq.${user.id},user_id.is.null`);
     if(cat) setCategoriesList(cat);
     const { data: crd } = await supabase.from('cards').select('id, name');
     if(crd) setCardsList(crd);

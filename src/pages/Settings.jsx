@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, User, Lock, Download, AlertTriangle, Shield, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell } from 'lucide-react';
+import { Save, User, Lock, Download, AlertTriangle, Shield, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell, Edit2, X, Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Check, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+export const ICON_MAP = { Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill };
+export const AVAILABLE_COLORS = [ { name: 'Cinza', hex: '#a1a1aa' }, { name: 'Roxo', hex: '#a855f7' }, { name: 'Verde', hex: '#10b981' }, { name: 'Vermelho', hex: '#ef4444' }, { name: 'Laranja', hex: '#f97316' }, { name: 'Amarelo', hex: '#f59e0b' }, { name: 'Azul', hex: '#3b82f6' }, { name: 'Rosa', hex: '#f43f5e' } ];
 
 export default function Settings() {
   const { user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor } = useAuth();
@@ -24,7 +27,7 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [pwdMessage, setPwdMessage] = useState('');
   const [categories, setCategories] = useState([]);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [catForm, setCatForm] = useState({ id: null, name: '', icon: 'Tag', color: '#a1a1aa' });
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [dangerLoading, setDangerLoading] = useState(false);
 
@@ -36,7 +39,7 @@ export default function Settings() {
     setLoading(true);
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (profileData) setProfile(profileData);
-    const { data: catData } = await supabase.from('categories').select('*').order('name');
+    const { data: catData } = await supabase.from('categories').select('*').or(`user_id.eq.${user.id},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
     setLoading(false);
   };
@@ -73,23 +76,70 @@ export default function Settings() {
     setTimeout(() => setPwdMessage(''), 3000);
   };
 
-  const handleAddCategory = async (e) => {
+  const handleSaveCategory = async (e) => {
     e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    const { error } = await supabase.from('categories').insert([{
-      name: newCategoryName,
-      user_id: user.id,
-      color: '#' + Math.floor(Math.random()*16777215).toString(16)
-    }]);
-    if (!error) {
-      setNewCategoryName('');
+    if (!catForm.name.trim()) return;
+    
+    // Identifica se estamos editando uma categoria global nativa
+    const targetCat = categories.find(c => c.id === catForm.id);
+    const isGlobal = targetCat && targetCat.user_id === null;
+    
+    const payload = {
+      name: catForm.name,
+      icon: catForm.icon,
+      color: catForm.color,
+      user_id: user.id
+    };
+    
+    let errorObj = null;
+    if (catForm.id && !isGlobal) {
+      // É local e o usuário pode alterar
+      const { error } = await supabase.from('categories').update(payload).eq('id', catForm.id);
+      errorObj = error;
+    } else {
+      // Se for global, a edição apenas cria uma TÓPIA local na conta (clonagem)
+      const { error } = await supabase.from('categories').insert([payload]);
+      errorObj = error;
+    }
+    
+    if (!errorObj) {
+      setCatForm({ id: null, name: '', icone: 'Tag', cor: '#a1a1aa' });
       fetchData();
+    } else {
+      alert('Erro ao salvar categoria: ' + errorObj.message);
     }
   };
 
-  const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Tem certeza? Isso pode afetar transações existentes.')) return;
-    await supabase.from('categories').delete().eq('id', id);
+  const handleEditCatClick = (cat) => {
+    setCatForm({
+      id: cat.id,
+      name: cat.name,
+      icon: cat.icon || cat.icone || 'Tag',
+      color: cat.color || cat.cor || '#a1a1aa'
+    });
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta categoria?')) return;
+    
+    // Verificadora Preventiva na tabela de Despesas
+    const { data: linked, error: queryError } = await supabase.from('expenses').select('id').eq('category_id', cat.id).limit(1);
+    
+    if (queryError) {
+      return alert("Erro ao checar despesas vinculadas: " + queryError.message);
+    }
+    
+    if (linked && linked.length > 0) {
+      return alert(`⚠️ Bloqueio Preventivo!\n\nVocê tem despesas usando a categoria "${cat.name}".\nVá na aba de Despesas e altere a categoria delas (ou exclua-as) para poder apagar esta categoria de forma segura.`);
+    }
+
+    // Tentar Excluir do Banco
+    const { error: deleteError } = await supabase.from('categories').delete().eq('id', cat.id);
+    
+    if (deleteError) {
+       return alert(`❌ O Supabase bloqueou a exclusão!\n\nMotivo do Banco de Dados: ${deleteError.message}`);
+    }
+
     fetchData();
   };
 
@@ -259,25 +309,102 @@ export default function Settings() {
 
             <hr className="my-8 border-border" />
 
-            <h3 className="text-lg font-medium text-content mb-4">Gestão de Categorias</h3>
-            <div className="bg-background/50 border border-border rounded-xl p-4 max-h-48 overflow-y-auto space-y-2 mb-4">
-              {categories.map(cat => (
-                <div key={cat.id} className="flex justify-between items-center group">
-                   <span className="text-sm text-muted flex items-center gap-2">
-                     <div className="w-3 h-3 rounded-full" style={{backgroundColor: cat.color}}></div>
-                     {cat.name} {!cat.user_id && <span className="text-xs bg-border px-1 rounded text-muted">Global</span>}
-                   </span>
-                   {cat.user_id === user.id && (
-                     <button onClick={() => handleDeleteCategory(cat.id)} className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-                   )}
-                </div>
-              ))}
+            <h3 className="text-lg font-medium text-content mb-4 flex items-center justify-between">Gestão de Categorias <span className="text-xs font-normal text-muted bg-surface px-2 py-1 rounded border border-border">Total: {categories.length}</span></h3>
+            
+            {/* CURRENT CATEGORIES LIST */}
+            <div className="bg-background/50 border border-border rounded-xl p-2 max-h-60 overflow-y-auto space-y-1 mb-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+              {categories.map(cat => {
+                const IconComp = ICON_MAP[cat.icon] || ICON_MAP[cat.icone] || ICON_MAP['Tag'];
+                const displayColor = cat.color || cat.cor || '#a1a1aa';
+                return (
+                  <div key={cat.id} className={cn("group flex justify-between items-center p-2 rounded-lg transition-colors border border-transparent", catForm.id === cat.id ? "bg-primary/5 border-primary/20" : "hover:bg-surface")}>
+                     <span className="text-sm font-medium flex items-center gap-3">
+                       <div className="p-1.5 rounded-lg bg-surface border shadow-sm flex items-center justify-center transition-colors" style={{ borderColor: `${displayColor}30` }}>
+                          <IconComp size={16} style={{ color: displayColor }} />
+                       </div>
+                       <span style={{ color: displayColor }} className="drop-shadow-sm">{cat.name}</span>
+                       {!cat.user_id && <span className="text-[10px] bg-border/50 uppercase tracking-wide px-1.5 py-0.5 rounded text-muted ml-1">Global</span>}
+                     </span>
+                     
+                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <button type="button" onClick={() => handleEditCatClick(cat)} className="p-1.5 text-muted hover:text-cyan-400 rounded transition-colors"><Edit2 size={16} /></button>
+                       {cat.user_id === user.id ? (
+                         <button type="button" onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-muted hover:text-rose-400 rounded transition-colors"><Trash2 size={16} /></button>
+                       ) : (
+                         <span className="p-1.5 text-muted/30" title="Categorias globais não podem ser excluídas"><Trash2 size={16}/></span>
+                       )}
+                     </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <form onSubmit={handleAddCategory} className="flex gap-2">
-               <input type="text" placeholder="Nova categoria..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} required className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-1.5 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-               <button type="submit" className="bg-border hover:bg-surface px-3 py-1.5 rounded-lg text-primary-glow"><Plus size={18} /></button>
-            </form>
+            {/* FORMULÁRIO DE CATEGORIA (BUILDER) */}
+            <div className="bg-surface/80 border border-border rounded-xl p-4 md:p-5 relative overflow-hidden">
+               {/* Decorative Gradient */}
+               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
+
+               <div className="flex items-center justify-between mb-4">
+                 <h4 className="font-semibold text-content text-sm">{catForm.id ? 'Editar Categoria' : 'Criar Nova Categoria'}</h4>
+                 {catForm.id && (
+                   <button type="button" onClick={() => setCatForm({ id: null, name: '', icon: 'Tag', color: '#a1a1aa' })} className="text-xs font-medium text-muted hover:text-content flex items-center gap-1 transition-colors px-2 py-1 rounded bg-background border border-border"><X size={14}/> Cancelar</button>
+                 )}
+               </div>
+
+               <form onSubmit={handleSaveCategory} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wide">Nome da Categoria</label>
+                    <input type="text" placeholder="Ex: Viagens..." value={catForm.name} onChange={e => setCatForm({...catForm, name: e.target.value})} required className="w-full bg-background/80 border border-border rounded-lg px-4 py-2.5 text-sm font-medium text-content focus:outline-none focus:border-primary/50 transition-all placeholder:text-zinc-600 shadow-inner" />
+                  </div>
+
+                  {/* Icon Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wide mb-1 block">Ícone Visual</label>
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2.5 sm:gap-3 p-4 bg-background/50 border border-border/50 rounded-xl">
+                      {Object.keys(ICON_MAP).map(key => {
+                        const IconComponent = ICON_MAP[key];
+                        if (!IconComponent) return null;
+                        const isSelected = catForm.icon === key;
+                        return (
+                          <button 
+                            key={key} type="button" 
+                            onClick={() => setCatForm({...catForm, icon: key})}
+                            className={cn("w-11 h-11 sm:w-12 sm:h-12 flex-shrink-0 rounded-2xl border flex items-center justify-center transition-all", isSelected ? "bg-primary/20 border-primary text-primary-glow shadow-md scale-110 z-10" : "bg-surface border-border/50 text-muted hover:text-content hover:bg-border/60")}
+                            title={key}
+                          >
+                            <IconComponent size={24} strokeWidth={2} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted font-bold uppercase tracking-wide mb-1 block">Cor de Destaque</label>
+                    <div className="flex flex-wrap gap-3 p-3 bg-background/50 border border-border/50 rounded-xl">
+                      {AVAILABLE_COLORS.map(c => (
+                        <button 
+                          key={c.name} type="button"
+                          onClick={() => setCatForm({...catForm, color: c.hex})}
+                          className={cn("w-8 h-8 rounded-full border-2 transition-transform flex items-center justify-center", catForm.color === c.hex ? "scale-125 border-white shadow-md shadow-white/10 z-10" : "border-transparent hover:scale-110 shadow-sm opacity-80 hover:opacity-100")}
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        >
+                           {catForm.color === c.hex && <Check size={14} className="text-white drop-shadow-md" strokeWidth={3} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <button type="submit" className="w-full bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary-glow font-bold tracking-wide py-2.5 rounded-xl transition-all flex justify-center items-center gap-2 shadow-sm">
+                      {catForm.id ? <Save size={18} /> : <Plus size={18} />} 
+                      {catForm.id ? 'Salvar Edição' : 'Adicionar Categoria'}
+                    </button>
+                  </div>
+               </form>
+            </div>
           </section>
 
           {/* NOTIFICATION PREFS SECTION */}
