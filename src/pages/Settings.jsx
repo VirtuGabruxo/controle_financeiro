@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, User, Lock, Download, AlertTriangle, Shield, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun } from 'lucide-react';
+import { Save, User, Lock, Download, AlertTriangle, Shield, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Settings() {
@@ -16,7 +16,9 @@ export default function Settings() {
     salario_padrao: 4452.00,
     dia_virada: 1,
     ocultar_saldos: false,
-    cor_destaque: 'emerald'
+    cor_destaque: 'emerald',
+    notificar_vencimentos: false,
+    dias_antecedencia: 3
   });
 
   const [newPassword, setNewPassword] = useState('');
@@ -94,10 +96,19 @@ export default function Settings() {
   const handleExportCSV = async () => {
     const { data: incomes } = await supabase.from('incomes').select('*, categories(name)').eq('user_id', user.id);
     const { data: expenses } = await supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id);
-    let csvData = 'Tipo,Data,Descrição,Categoria,Valor\n';
-    incomes?.forEach(i => csvData += `Receita,${i.income_date},"${i.description}",${i.categories?.name || ''},${i.amount}\n`);
-    expenses?.forEach(e => csvData += `Despesa,${e.expense_date},"${e.description}",${e.categories?.name || ''},${e.amount}\n`);
-    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    
+    let csvData = 'Tipo;Data;Descrição;Categoria;Valor\n';
+    
+    incomes?.forEach(i => {
+      const val = i.net_amount !== undefined ? i.net_amount : (i.gross_amount - (i.discounts||0));
+      csvData += `Receita;${i.month};"${i.description}";${i.categories?.name || 'Geral'};${val.toString().replace('.',',')}\n`;
+    });
+    
+    expenses?.forEach(e => {
+      csvData += `Despesa;${e.expense_date};"${e.description}";${e.categories?.name || 'Geral'};${e.amount.toString().replace('.',',')}\n`;
+    });
+    
+    const blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `extrato_${new Date().toISOString().slice(0,10)}.csv`;
@@ -203,18 +214,15 @@ export default function Settings() {
               <label className="text-sm text-muted">Email (Não editável)</label>
               <input type="text" disabled value={user.email} className="w-full bg-background/80 border border-border/50 rounded-xl px-4 py-2 text-muted cursor-not-allowed" />
             </div>
-            
             <div className="space-y-2">
               <label className="text-sm text-muted">Nome Completo</label>
               <input type="text" name="full_name" value={profile.full_name || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
-
             <div className="space-y-2">
               <label className="text-sm text-muted">URL da Foto de Perfil</label>
               <input type="url" name="avatar_url" value={profile.avatar_url || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
-
-            <button type="submit" disabled={savingProfile} className="w-full bg-border hover:bg-zinc-700 text-content font-medium py-2 rounded-xl transition-colors flex justify-center items-center gap-2">
+            <button type="submit" disabled={savingProfile} className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors flex justify-center items-center gap-2">
               {savingProfile ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Salvar Perfil
             </button>
             {profileMessage && <p className="text-sm text-center text-primary-glow mt-2">{profileMessage}</p>}
@@ -228,64 +236,91 @@ export default function Settings() {
               <label className="text-sm text-muted">Nova Senha</label>
               <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={6} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
-            <button type="submit" className="w-full bg-border hover:bg-zinc-700 text-content font-medium py-2 rounded-xl transition-colors">Atualizar Senha</button>
+            <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors">Atualizar Senha</button>
             {pwdMessage && <p className="text-sm text-center text-muted mt-2">{pwdMessage}</p>}
           </form>
         </section>
 
-        {/* FINANCIAL PREFS SECTION */}
-        <section className="bg-surface/50 border border-border rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Wallet size={20} className="text-blue-400" /> Configurações Financeiras</h2>
-          <form onSubmit={saveProfile} className="space-y-4">
-             <div className="space-y-2">
-              <label className="text-sm text-muted">Salário Base Padrão (R$)</label>
-              <input type="number" step="0.01" name="salario_padrao" value={profile.salario_padrao} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-muted">Dia de Virada do Mês</label>
-              <input type="number" min="1" max="31" name="dia_virada" value={profile.dia_virada} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            </div>
-            <button type="submit" className="w-full bg-border hover:bg-zinc-700 text-content font-medium py-2 rounded-xl transition-colors">Salvar Configurações</button>
-          </form>
-
-          <hr className="my-8 border-border" />
-
-          <h3 className="text-lg font-medium text-content mb-4">Gestão de Categorias</h3>
-          <div className="bg-background/50 border border-border rounded-xl p-4 max-h-48 overflow-y-auto space-y-2 mb-4">
-            {categories.map(cat => (
-              <div key={cat.id} className="flex justify-between items-center group">
-                 <span className="text-sm text-muted flex items-center gap-2">
-                   <div className="w-3 h-3 rounded-full" style={{backgroundColor: cat.color}}></div>
-                   {cat.name} {!cat.user_id && <span className="text-xs bg-border px-1 rounded text-muted">Global</span>}
-                 </span>
-                 {cat.user_id === user.id && (
-                   <button onClick={() => handleDeleteCategory(cat.id)} className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-                 )}
+        <div className="space-y-8">
+          {/* FINANCIAL PREFS SECTION */}
+          <section className="bg-surface/50 border border-border rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Wallet size={20} className="text-blue-400" /> Configurações Financeiras</h2>
+            <form onSubmit={saveProfile} className="space-y-4">
+               <div className="space-y-2">
+                <label className="text-sm text-muted">Salário Base Padrão (R$)</label>
+                <input type="number" step="0.01" name="salario_padrao" value={profile.salario_padrao} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted">Dia de Virada do Mês</label>
+                <input type="number" min="1" max="31" name="dia_virada" value={profile.dia_virada} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors">Salvar Configurações</button>
+            </form>
 
-          <form onSubmit={handleAddCategory} className="flex gap-2">
-             <input type="text" placeholder="Nova categoria..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} required className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-1.5 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-             <button type="submit" className="bg-border hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-primary-glow"><Plus size={18} /></button>
-          </form>
-        </section>
+            <hr className="my-8 border-border" />
+
+            <h3 className="text-lg font-medium text-content mb-4">Gestão de Categorias</h3>
+            <div className="bg-background/50 border border-border rounded-xl p-4 max-h-48 overflow-y-auto space-y-2 mb-4">
+              {categories.map(cat => (
+                <div key={cat.id} className="flex justify-between items-center group">
+                   <span className="text-sm text-muted flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full" style={{backgroundColor: cat.color}}></div>
+                     {cat.name} {!cat.user_id && <span className="text-xs bg-border px-1 rounded text-muted">Global</span>}
+                   </span>
+                   {cat.user_id === user.id && (
+                     <button onClick={() => handleDeleteCategory(cat.id)} className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                   )}
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddCategory} className="flex gap-2">
+               <input type="text" placeholder="Nova categoria..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} required className="flex-1 bg-background/50 border border-border rounded-lg px-3 py-1.5 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+               <button type="submit" className="bg-border hover:bg-surface px-3 py-1.5 rounded-lg text-primary-glow"><Plus size={18} /></button>
+            </form>
+          </section>
+
+          {/* NOTIFICATION PREFS SECTION */}
+          <section className="bg-surface/50 border border-border rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Bell size={20} className="text-amber-400" /> Notificações e Alertas</h2>
+            <form onSubmit={saveProfile} className="space-y-4">
+               <div>
+                 <div className="flex items-center justify-between">
+                   <span className="text-sm font-medium text-content flex-1 max-w-[80%]">Alertar vencimento de faturas e empréstimos</span>
+                   <label className="relative inline-flex items-center cursor-pointer">
+                     <input type="checkbox" name="notificar_vencimentos" checked={profile.notificar_vencimentos} onChange={handleProfileChange} className="sr-only peer" />
+                     <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                   </label>
+                 </div>
+               </div>
+
+               {profile.notificar_vencimentos && (
+                 <div className="space-y-2 pt-2 border-t border-border/50 animate-in fade-in zoom-in duration-200">
+                   <label className="text-sm text-muted">Avisar com quantos dias de antecedência?</label>
+                   <input type="number" min="1" max="15" name="dias_antecedencia" value={profile.dias_antecedencia} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                 </div>
+               )}
+
+               <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors mt-2">Salvar Alertas</button>
+            </form>
+          </section>
+        </div>
 
         {/* DANGER ZONE SECTION */}
-        <section className="bg-red-950/20 md:col-span-2 border border-red-900/50 rounded-2xl p-6">
+        <section className="bg-red-950/10 md:col-span-2 border border-red-900/40 rounded-2xl p-6">
           <h2 className="text-xl font-semibold text-red-500 flex items-center gap-2 mb-6"><AlertTriangle size={20} /> Zona de Perigo</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <h3 className="font-medium text-content">Exportar Dados</h3>
-              <p className="text-sm text-muted mb-3">Baixe um CSV com todas as suas transações.</p>
-              <button onClick={handleExportCSV} className="bg-border hover:bg-zinc-700 text-content px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
-                <Download size={16} /> Baixar CSV
+              <p className="text-sm text-muted mb-3">Baixe um CSV com todas as suas transações (Formatado para Excel BR com ; e UTF-8).</p>
+              <button onClick={handleExportCSV} className="bg-border hover:bg-surface text-content px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
+                <Download size={16} /> Baixar Extrato CSV
               </button>
             </div>
-            <div className="border-t md:border-t-0 border-red-900/30 pt-6 md:pt-0">
+            <div className="border-t md:border-t-0 border-red-900/20 pt-6 md:pt-0">
               <h3 className="font-medium text-red-400">Ações Destrutivas</h3>
               <p className="text-sm text-muted mb-4">Estas ações não podem ser desfeitas. Confirme digitando abaixo:</p>
-              <input type="text" placeholder='Ex: "CONFIRMAR LIMPEZA"' value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className="w-full bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-2 text-content focus:outline-none focus:border-red-500 mb-4 text-sm uppercase" />
+              <input type="text" placeholder='Ex: "CONFIRMAR LIMPEZA"' value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-4 py-2 text-content focus:outline-none focus:border-red-500 mb-4 text-sm uppercase" />
               <div className="flex gap-3">
                 <button onClick={handleClearData} disabled={dangerLoading || deleteConfirm !== 'CONFIRMAR LIMPEZA'} className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Zerar Transações</button>
                 <button onClick={handleDeleteAccount} disabled={dangerLoading || deleteConfirm !== 'DELETAR CONTA'} className="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Excluir Conta</button>

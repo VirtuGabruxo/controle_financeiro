@@ -280,7 +280,7 @@ export default function Reports() {
                </div>
              ) : (
                <>
-                 <div className="flex-1 w-full min-h-[350px]">
+                 <div className="w-full h-[350px] md:h-[400px]">
                    <ResponsiveContainer width="100%" height="100%">
                      {chartType === 'pie' ? (
                        <PieChart>

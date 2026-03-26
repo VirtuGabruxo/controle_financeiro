@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, CreditCard, Loader2, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet } from 'lucide-react';
+import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Expenses() {
   const { user, showBalances } = useAuth();
   
-  // States
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -19,7 +18,7 @@ export default function Expenses() {
     return d;
   };
   const [currentMonth, setCurrentMonth] = useState(getLocalDate());
-  const [activeTab, setActiveTab] = useState('all'); // 'all', 'debit', or card_id
+  const [activeTab, setActiveTab] = useState('all');
   
   // Form State
   const [editingId, setEditingId] = useState(null);
@@ -30,25 +29,19 @@ export default function Expenses() {
   const [categoryId, setCategoryId] = useState('');
   const [cardId, setCardId] = useState('debit'); 
   const [installments, setInstallments] = useState('1');
-  const [isRecurring, setIsRecurring] = useState(false);
+  const [expenseType, setExpenseType] = useState('common'); // 'common', 'fixed', 'loan'
 
   // Card Manager Modal State
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardForm, setCardForm] = useState({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
 
-  useEffect(() => {
-    fetchCoreData();
-  }, [user]);
-
-  useEffect(() => {
-    fetchExpenses();
-  }, [user, currentMonth]);
+  useEffect(() => { fetchCoreData(); }, [user]);
+  useEffect(() => { fetchExpenses(); }, [user, currentMonth]);
 
   const fetchCoreData = async () => {
     const { data: catData } = await supabase.from('categories').select('*').order('name');
     if (catData) setCategories(catData);
-    
     const { data: cardData } = await supabase.from('cards').select('*').order('name');
     if (cardData) setCards(cardData);
   };
@@ -62,9 +55,7 @@ export default function Expenses() {
       const lastDayNum = new Date(year, currentMonth.getMonth() + 1, 0).getDate();
       const endDay = `${year}-${monthStr}-${lastDayNum}T23:59:59`;
 
-      // Se a query reclamar de relations, lembre que o Supabase resolve relations nativamente pelas Foreign Keys definidas
-      const { data, error } = await supabase
-        .from('expenses')
+      const { data, error } = await supabase.from('expenses')
         .select(`*, categories(name, color), cards(*)`)
         .gte('expense_date', startDay)
         .lte('expense_date', endDay)
@@ -85,16 +76,19 @@ export default function Expenses() {
     setIsSubmitting(true);
     
     try {
+      const isRecurring = expenseType === 'fixed';
+      const isLoan = expenseType === 'loan';
+      
       const payloadBase = {
         user_id: user.id,
         category_id: categoryId,
-        card_id: cardId === 'debit' ? null : cardId,
+        card_id: (cardId === 'debit' || isLoan) ? null : cardId,
         is_recurring: isRecurring,
+        expense_type: expenseType,
         status: 'pending' // Default status
       };
 
       if (editingId) {
-        // Editar não afeta parcelas projetadas, apenas a unidade selecionada
         await supabase.from('expenses').update({
           ...payloadBase,
           description,
@@ -103,18 +97,19 @@ export default function Expenses() {
         }).eq('id', editingId);
       } else {
         const qty = isRecurring ? 24 : parseInt(installments || '1');
-        const baseAmount = isRecurring ? parseFloat(amount) : (parseFloat(amount) / qty);
+        const baseAmount = (isRecurring || isLoan) ? parseFloat(amount) : (parseFloat(amount) / qty);
+        // Note: For loans, 'amount' is usually the installment parcel value directly. 
+        // If they enter 10 parcels of 500, we make 10 entries of 500.
         
         const payloads = [];
         let d = new Date(`${expenseDate}T12:00:00`); 
         
         for(let i=0; i < qty; i++) {
           payloads.push({
-            ...payloadBase,
-            description: qty > 1 && !isRecurring ? `${description} (${i+1}/${qty})` : description,
-            amount: baseAmount,
-            expense_date: d.toISOString().split('T')[0],
-            // As colunas installment nativas talvez não existam, o texto já resolve a UI.
+             ...payloadBase,
+             description: qty > 1 && !isRecurring ? `${description} (${i+1}/${qty})` : description,
+             amount: baseAmount,
+             expense_date: d.toISOString().split('T')[0],
           });
           d.setMonth(d.getMonth() + 1);
         }
@@ -134,14 +129,7 @@ export default function Expenses() {
     e.preventDefault();
     setIsSubmittingCard(true);
     try {
-      const { error } = await supabase.from('cards').insert([{
-        user_id: user.id,
-        name: cardForm.name,
-        color: cardForm.color,
-        closing_day: parseInt(cardForm.closing_day),
-        due_day: parseInt(cardForm.due_day),
-        credit_limit: parseFloat(cardForm.credit_limit || 0)
-      }]);
+      const { error } = await supabase.from('cards').insert([{ user_id: user.id, name: cardForm.name, color: cardForm.color, closing_day: parseInt(cardForm.closing_day), due_day: parseInt(cardForm.due_day), credit_limit: parseFloat(cardForm.credit_limit || 0) }]);
       if (error) throw error;
       setShowCardModal(false);
       setCardForm({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
@@ -156,9 +144,7 @@ export default function Expenses() {
   const toggleStatus = async (exp) => {
      const newStatus = exp.status === 'paid' ? 'pending' : 'paid';
      const { error } = await supabase.from('expenses').update({ status: newStatus }).eq('id', exp.id);
-     if (!error) {
-        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, status: newStatus } : e));
-     }
+     if (!error) setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, status: newStatus } : e));
   };
 
   const handleEdit = (exp) => {
@@ -168,8 +154,8 @@ export default function Expenses() {
     setExpenseDate(exp.expense_date);
     setCategoryId(exp.category_id || '');
     setCardId(exp.card_id || 'debit');
-    setIsRecurring(exp.is_recurring || false);
-    setInstallments('1'); // Block editing multiple instantly
+    setExpenseType(exp.expense_type || (exp.is_recurring ? 'fixed' : 'common'));
+    setInstallments('1');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -178,7 +164,7 @@ export default function Expenses() {
     setDescription('');
     setAmount('');
     setInstallments('1');
-    setIsRecurring(false);
+    setExpenseType('common');
   };
 
   const handleDelete = async (id) => {
@@ -187,18 +173,14 @@ export default function Expenses() {
     if (!error) fetchExpenses();
   };
 
-  // Nav actions
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const goNextMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
 
-  // Formatters
   const formatCurrency = (val) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val) : 'R$ ****';
   const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentMonth);
 
-  // Derivations
   const filteredList = expenses.filter(e => activeTab === 'all' || (activeTab === 'debit' && !e.card_id) || e.card_id === activeTab);
   
-  // Card Summaries (Map invoices)
   const invoices = cards.map(c => {
     const total = expenses.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
     const pct = c.credit_limit > 0 ? Math.min((total / c.credit_limit) * 100, 100) : 0;
@@ -208,8 +190,6 @@ export default function Expenses() {
 
   return (
     <div className="space-y-6 md:space-y-8 max-w-7xl mx-auto w-full pb-12">
-      
-      {/* Top Bar Month Navigator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent">Minhas Despesas</h1>
@@ -217,19 +197,12 @@ export default function Expenses() {
         </div>
         
         <div className="flex items-center justify-between sm:justify-end gap-2 bg-surface/80 border border-border p-2 rounded-xl">
-          <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors">
-            <ChevronLeft size={20} />
-          </button>
-          <span className="min-w-[140px] text-center font-bold capitalize text-content text-sm md:text-base">
-            {monthName}
-          </span>
-          <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors">
-            <ChevronRight size={20} />
-          </button>
+          <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronLeft size={20} /></button>
+          <span className="min-w-[140px] text-center font-bold capitalize text-content text-sm md:text-base">{monthName}</span>
+          <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronRight size={20} /></button>
         </div>
       </div>
 
-      {/* Mini-Dashboard Faturas */}
       <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
          <div className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
             <div className="flex justify-between items-center mb-2">
@@ -237,32 +210,24 @@ export default function Expenses() {
             </div>
             <h2 className="text-2xl font-bold text-content">{formatCurrency(debitTotal)}</h2>
          </div>
-
          {invoices.map(c => (
            <div key={c.id} className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[260px] flex-shrink-0 snap-start relative overflow-hidden">
              <div className="flex justify-between items-center mb-1 relative z-10">
                <span className="text-muted font-medium text-sm flex items-center gap-2">
-                 <div className="w-3 h-3 rounded-full" style={{backgroundColor: c.color}}></div>
-                 Fatura {c.name}
+                 <div className="w-3 h-3 rounded-full" style={{backgroundColor: c.color}}></div> Fatura {c.name}
                </span>
                <span className="text-[10px] text-muted font-medium">Vence dia {c.due_day}</span>
              </div>
              <h2 className="text-2xl font-bold text-content mb-3 relative z-10">{formatCurrency(c.invoiceTotal)}</h2>
-             
-             {/* Progress Limit Bar */}
              <div className="relative z-10">
                <div className="flex justify-between text-[10px] text-muted mb-1">
-                 <span>Limite Comprometido</span>
-                 <span>{formatCurrency(c.credit_limit || 0)}</span>
+                 <span>Limite Comprometido</span> <span>{formatCurrency(c.credit_limit || 0)}</span>
                </div>
                <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
                  <div className="h-full rounded-full transition-all" style={{ width: `${c.pct}%`, backgroundColor: c.color }}></div>
                </div>
              </div>
-             
-             <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-white z-0 pointer-events-none">
-                <CreditCard size={80} />
-             </div>
+             <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-content z-0 pointer-events-none"><CreditCard size={80} /></div>
            </div>
          ))}
       </div>
@@ -275,37 +240,51 @@ export default function Expenses() {
              <h2 className="text-lg md:text-xl font-semibold text-content flex items-center gap-2">
                <Plus className="text-rose-400" /> {editingId ? 'Editar Despesa' : 'Novo Gasto'}
              </h2>
-             {editingId && (
-               <button type="button" onClick={handleCancelEdit} className="text-xs text-muted hover:text-muted">Cancelar</button>
-             )}
+             {editingId && <button type="button" onClick={handleCancelEdit} className="text-xs text-muted hover:text-content">Cancelar</button>}
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
+            
+            <div className="space-y-2 mb-4">
+               <label className="text-xs font-semibold text-muted tracking-wide uppercase">TIPO DE LANÇAMENTO</label>
+               <div className="grid grid-cols-3 gap-2">
+                 <button type="button" disabled={editingId} onClick={() => setExpenseType('common')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'common' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                    <FileText size={16} className="mb-1" /> Compra Comum
+                 </button>
+                 <button type="button" disabled={editingId} onClick={() => setExpenseType('fixed')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'fixed' ? "bg-blue-500/10 border-blue-500/50 text-blue-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                    <Repeat size={16} className="mb-1" /> Assinatura Fixa
+                 </button>
+                 <button type="button" disabled={editingId} onClick={() => setExpenseType('loan')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'loan' ? "bg-purple-500/10 border-purple-500/50 text-purple-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                    <Landmark size={16} className="mb-1" /> Empréstimo
+                 </button>
+               </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted">Descrição</label>
-              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Mercado" required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
+              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder={expenseType==='loan' ? "Ex: Financiamento Carro" : "Ex: Mercado"} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">Valor</label>
+                <label className="text-sm font-medium text-muted">{expenseType==='loan'?'Valor da Parcela':'Valor'}</label>
                 <div className="relative flex items-center bg-background/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-rose-500/50">
                   <span className="pl-3 text-muted text-sm">R$</span>
                   <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-transparent px-2 py-2.5 text-content focus:outline-none text-sm md:text-base" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">Data</label>
+                <label className="text-sm font-medium text-muted">{expenseType==='fixed'?'Dia do Vencimento':'Data'}</label>
                 <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm text-center" />
               </div>
             </div>
 
             <div className="space-y-1.5">
                <div className="flex justify-between items-center">
-                 <label className="text-sm font-medium text-muted">Forma de Pag. / Cartão</label>
-                 <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-primary-glow hover:text-emerald-300 flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>
+                 <label className="text-sm font-medium text-muted flex items-center gap-2">Forma de Pag. {expenseType === 'loan' && <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1 rounded">(Forçado à Débito/Pix)</span>}</label>
+                 {expenseType !== 'loan' && <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-primary-glow hover:text-content flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>}
                </div>
-               <select value={cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
+               <select disabled={expenseType === 'loan'} value={expenseType === 'loan' ? 'debit' : cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none disabled:opacity-60">
                  <option value="debit">Débito / Dinheiro / Pix</option>
                  {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}</option>)}
                </select>
@@ -321,37 +300,23 @@ export default function Expenses() {
                </div>
                <div className="space-y-1.5">
                  <label className="text-sm font-medium text-muted">Nº Parcelas</label>
-                 <input type="number" min="1" max="60" disabled={editingId || isRecurring} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
+                 <input type="number" min="1" max="120" disabled={editingId || expenseType === 'fixed'} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
                </div>
             </div>
 
-            <div className="pt-2">
-              <label className="flex items-center gap-3 cursor-pointer p-3 bg-background/30 border border-border/80 rounded-xl">
-                <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} disabled={editingId} className="w-4 h-4 rounded border-zinc-700 bg-surface text-rose-500 focus:ring-rose-500 focus:ring-offset-zinc-950 disabled:opacity-50" />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-content">Despesa Fixa (Assinatura)</span>
-                  <span className="text-[10px] text-muted">Repete o valor todo mês indefinidamente.</span>
-                </div>
-              </label>
-            </div>
-
             <button type="submit" disabled={isSubmitting} className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 text-sm md:text-base">
-               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (
-                 <>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Despesa'}</>
-               )}
+               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : ( <>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Lançamento'}</> )}
             </button>
           </form>
         </div>
 
         {/* Histórico/Lista */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-           
-           {/* Filtros de Tab */}
            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x">
-             <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-zinc-100 text-inverse" : "bg-surface/80 text-muted hover:bg-border")}>Todas</button>
-             <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-surface/80 text-muted hover:bg-border")}>Débito/Dinheiro</button>
+             <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
+             <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
              {cards.map(c => (
-               <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : '#27272a', color: activeTab === c.id ? c.color : '#a1a1aa' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-surface/80 hover:bg-border transition-all")}>{c.name}</button>
+               <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all")}>{c.name}</button>
              ))}
            </div>
 
@@ -359,7 +324,7 @@ export default function Expenses() {
              <div className="text-muted flex items-center gap-2"><Loader2 className="animate-spin" /> Carregando...</div>
           ) : filteredList.length === 0 ? (
              <div className="bg-surface/30 border border-border/50 border-dashed rounded-2xl p-8 md:p-12 text-center text-muted flex flex-col items-center">
-                <p>Nenhuma despesa correspondente encontrada neste mês.</p>
+                <p>Nenhum lançamento encontrado neste mês.</p>
              </div>
           ) : (
              <div className="space-y-3 md:space-y-4">
@@ -371,24 +336,26 @@ export default function Expenses() {
                    <div key={exp.id} className={cn(
                      "bg-surface/40 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-surface",
                      isPaid ? "border-primary/30 opacity-75" : "border-border/80",
-                     editingId === exp.id && "border-rose-500/50 ring-1 ring-rose-500/50"
+                     editingId === exp.id && "border-rose-500/50 ring-1 ring-rose-500/50",
+                     exp.expense_type === 'loan' && !isPaid && "border-purple-500/30 bg-purple-500/5"
                    )}>
                      
                      <div className="flex items-center gap-4 flex-1">
-                       <button onClick={() => toggleStatus(exp)} className="p-1 -m-1 transition-colors flex-shrink-0" title={isPaid ? "Ativar como Pendente" : "Marcar como Pago"}>
-                         {isPaid ? <CheckCircle2 className="text-primary" size={24} /> : <Circle className="text-zinc-600 hover:text-primary-glow" size={24} />}
+                       <button onClick={() => toggleStatus(exp)} className="p-1 -m-1 transition-colors flex-shrink-0">
+                         {isPaid ? <CheckCircle2 className="text-primary" size={24} /> : <Circle className="text-zinc-500 hover:text-primary-glow" size={24} />}
                        </button>
                        
                        <div className="min-w-0">
                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                            {card ? (
-                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md text-white border border-opacity-30 flex items-center gap-1" style={{ backgroundColor: `${card.color}20`, color: card.color, borderColor: card.color }}>
+                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border" style={{ backgroundColor: `${card.color}20`, color: card.color, borderColor: `${card.color}40` }}>
                                💳 {card.name}
                              </span>
                            ) : (
-                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-primary/10 text-primary-glow border border-primary/30">Débito</span>
+                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 border border-zinc-500/30">Débito/Dinheiro</span>
                            )}
-                           {exp.is_recurring && <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold text-center">Fixa</span>}
+                           {exp.expense_type === 'fixed' || exp.is_recurring ? <span className="text-[10px] bg-blue-500/10 text-blue-500 border border-blue-500/30 px-1.5 py-0.5 rounded uppercase font-bold">Assinatura</span> : null}
+                           {exp.expense_type === 'loan' && <span className="text-[10px] bg-purple-500/10 text-purple-500 border border-purple-500/30 px-1.5 py-0.5 rounded uppercase font-bold flex items-center gap-1"><Landmark size={10}/> Empréstimo</span>}
                          </div>
                          <p className={cn("font-medium text-sm md:text-base text-content truncate", isPaid && "line-through text-muted")}>{exp.description}</p>
                          <p className="text-xs text-muted mt-0.5 flex items-center gap-2">
@@ -400,11 +367,11 @@ export default function Expenses() {
 
                      <div className="flex items-center justify-between sm:justify-end gap-4 border-t border-border/50 sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
                        <div className="text-left sm:text-right flex flex-col items-start sm:items-end flex-shrink-0">
-                         <span className={cn("text-lg md:text-xl font-bold transition-colors", isPaid ? "text-primary" : "text-rose-400")}>{formatCurrency(exp.amount)}</span>
+                         <span className={cn("text-lg md:text-xl font-bold transition-colors", isPaid ? "text-primary" : (exp.expense_type==='loan' ? "text-purple-500" : "text-rose-400"))}>{formatCurrency(exp.amount)}</span>
                        </div>
                        <div className="flex items-center gap-1 flex-shrink-0">
-                         <button onClick={() => handleEdit(exp)} className="text-muted hover:text-muted p-2 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
-                         <button onClick={() => handleDelete(exp.id)} className="text-muted hover:text-red-400 p-2 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                         <button onClick={() => handleEdit(exp)} className="text-muted hover:text-content p-2 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                         <button onClick={() => handleDelete(exp.id)} className="text-muted hover:text-red-400 p-2 rounded-lg transition-colors"><Trash2 size={16} /></button>
                        </div>
                      </div>
                    </div>
@@ -415,7 +382,6 @@ export default function Expenses() {
         </div>
       </div>
       
-      {/* Modal de Gestão de Cartões */}
       {showCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -445,25 +411,19 @@ export default function Expenses() {
                 <h4 className="text-sm font-semibold text-muted">Novo Cartão</h4>
                 <div className="grid grid-cols-2 gap-3">
                    <input type="text" placeholder="Nome do Cartão" value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="col-span-2 bg-background/50 border border-border rounded-lg px-3 py-2 text-sm text-content" />
-                   
                    <div className="flex items-center gap-2 col-span-2">
-                     <span className="text-xs text-muted whitespace-nowrap">Cor visual: </span>
                      <input type="color" value={cardForm.color} onChange={e=>setCardForm({...cardForm, color: e.target.value})} className="w-10 h-8 rounded border-none bg-transparent cursor-pointer" />
                    </div>
-                   
                    <div className="space-y-1">
-                     <label className="text-[10px] text-muted">Dia Vencimento</label>
-                     <input type="number" min="1" max="31" value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
+                     <input type="number" min="1" max="31" placeholder='Venc.' value={cardForm.due_day} onChange={e=>setCardForm({...cardForm, due_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
                    </div>
                    <div className="space-y-1">
-                     <label className="text-[10px] text-muted">Dia Fechamento</label>
-                     <input type="number" min="1" max="31" value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
+                     <input type="number" min="1" max="31" placeholder='Fecha' value={cardForm.closing_day} onChange={e=>setCardForm({...cardForm, closing_day: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-sm text-content" />
                    </div>
                    <div className="col-span-2 space-y-1">
-                     <label className="text-[10px] text-muted">Limite Total (Opcional)</label>
                      <div className="relative flex items-center bg-background/50 border border-border rounded-lg focus-within:ring-1 focus-within:ring-primary/50">
                        <span className="pl-3 text-muted text-xs">R$</span>
-                       <input type="number" step="0.01" min="0" placeholder="0.00" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-2 py-2 text-sm text-content focus:outline-none" />
+                       <input type="number" step="0.01" min="0" placeholder="Limite Opcional" value={cardForm.credit_limit} onChange={e=>setCardForm({...cardForm, credit_limit: e.target.value})} className="w-full bg-transparent px-2 py-2 text-sm text-content focus:outline-none" />
                      </div>
                    </div>
                 </div>
@@ -474,8 +434,7 @@ export default function Expenses() {
           </div>
         </div>
       )}
-      {/* Scrollbar CSS Patch */}
-      <style>{`.scrollbar-none::-webkit-scrollbar{display:none;} .custom-scrollbar::-webkit-scrollbar{width:4px;} .custom-scrollbar::-webkit-scrollbar-track{background:transparent;} .custom-scrollbar::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px;}`}</style>
+      <style>{`.scrollbar-none::-webkit-scrollbar{display:none;} .custom-scrollbar::-webkit-scrollbar{width:4px;} .custom-scrollbar::-webkit-scrollbar-track{background:transparent;} .custom-scrollbar::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}`}</style>
     </div>
   );
 }
