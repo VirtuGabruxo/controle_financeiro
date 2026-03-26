@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function Sidebar() {
   const location = useLocation();
-  const { signOut, showBalances, setShowBalances } = useAuth();
+  const { signOut, showBalances, setShowBalances, user, profile } = useAuth();
   
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: Home },
@@ -63,22 +63,42 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      <div className="p-4 border-t border-border flex items-center justify-between gap-2">
-        <button 
-          onClick={() => setShowBalances(!showBalances)}
-          className="flex items-center justify-center p-2 text-muted hover:text-primary-glow transition-colors rounded-lg hover:bg-border/50"
-          title={showBalances ? "Ocultar Valores" : "Mostrar Valores"}
-        >
-          {showBalances ? <EyeOff size={20} /> : <Eye size={20} />}
-        </button>
-        <button 
-          onClick={() => signOut()}
-          className="flex flex-1 items-center justify-center gap-2 p-2 text-muted hover:text-red-400 transition-colors rounded-lg hover:bg-border/50"
-          title="Sair"
-        >
-          <LogOut size={20} />
-          <span className="font-medium">Sair</span>
-        </button>
+      <div className="p-4 border-t border-border flex flex-col gap-3 mt-auto">
+        {/* Profile Card */}
+        <div className="flex items-center gap-3 px-2 mb-1">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full object-cover border-2 shadow-sm" style={{ borderColor: 'var(--primary)' }} />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center font-bold shadow-sm text-content" style={{ borderColor: 'var(--primary)' }}>
+              {profile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+          )}
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <span className="text-sm font-semibold text-content block truncate leading-tight">{profile?.full_name || 'Minha Conta'}</span>
+            <span className="text-[10px] text-muted block truncate leading-tight mt-0.5">{user?.email}</span>
+          </div>
+        </div>
+
+        {/* Global Control Row */}
+        <div className="flex items-center justify-between gap-1.5 bg-background/50 p-1.5 rounded-xl border border-border">
+          <button 
+            onClick={() => setShowBalances(!showBalances)}
+            className="flex flex-1 items-center justify-center p-2 text-muted hover:text-content transition-all rounded-lg hover:bg-surface"
+            title={showBalances ? "Ocultar Valores" : "Mostrar Valores"}
+          >
+            {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+          
+          <div className="w-px h-6 bg-border mx-1"></div>
+
+          <button 
+            onClick={() => signOut()}
+            className="flex flex-1 items-center justify-center p-2 text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-all rounded-lg"
+            title="Sair do FinControl"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </div>
     </aside>
   );
