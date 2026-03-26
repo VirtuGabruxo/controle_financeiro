@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, DollarSign, CreditCard, Settings as SettingsIcon } from 'lucide-react';
+import { Home, DollarSign, CreditCard, Settings as SettingsIcon, Target, PieChart, LineChart } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function BottomNav() {
@@ -9,11 +9,15 @@ export default function BottomNav() {
     { name: 'Painel', path: '/dashboard', icon: Home },
     { name: 'Rendas', path: '/incomes', icon: DollarSign },
     { name: 'Despesas', path: '/expenses', icon: CreditCard },
+    { name: 'Cartões', path: '/cards', icon: CreditCard },
+    { name: 'Metas', path: '/goals', icon: Target },
+    { name: 'Relatórios', path: '/reports', icon: PieChart },
+    { name: 'Balanço', path: '/net-worth', icon: LineChart },
     { name: 'Config', path: '/settings', icon: SettingsIcon },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 z-50 flex justify-around items-center px-2 py-1 safe-area-pb">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 z-50 flex overflow-x-auto scrollbar-none snap-x items-center px-2 py-1 safe-area-pb w-full">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname.startsWith(item.path);
@@ -23,7 +27,7 @@ export default function BottomNav() {
             key={item.name}
             to={item.path}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all w-16 h-14",
+              "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all w-16 h-14 snap-start flex-shrink-0 relative",
               isActive 
                 ? "text-emerald-400" 
                 : "text-zinc-500 hover:text-zinc-300"

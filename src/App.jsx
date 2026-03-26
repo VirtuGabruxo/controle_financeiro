@@ -8,6 +8,10 @@ import UpdatePassword from './pages/UpdatePassword';
 import Settings from './pages/Settings';
 import Incomes from './pages/Incomes';
 import Expenses from './pages/Expenses';
+import Cards from './pages/Cards';
+import Goals from './pages/Goals';
+import Reports from './pages/Reports';
+import NetWorth from './pages/NetWorth';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
@@ -36,6 +40,10 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/incomes" element={<Incomes />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/cards" element={<Cards />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/net-worth" element={<NetWorth />} />
           </Route>
         </Routes>
       </Router>
