@@ -13,8 +13,24 @@ import Goals from './pages/Goals';
 import Reports from './pages/Reports';
 import NetWorth from './pages/NetWorth';
 
+import { useIdleTimeout } from './hooks/useIdleTimeout';
+import { Loader2 } from 'lucide-react';
+
 const ProtectedRoute = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  // Ativa a verificação Nível Bancário: 5 minutos de inatividade
+  useIdleTimeout(5);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-cyan-400 mb-4" size={48} />
+        <p className="text-muted font-medium animate-pulse">Autenticando sessão segura...</p>
+      </div>
+    );
+  }
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
