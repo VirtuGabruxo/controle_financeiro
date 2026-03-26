@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard, Loader2, Trash2 } from 'lucide-react';
 
 export default function Expenses() {
-  const { user } = useAuth();
+  const { user, showBalances } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +91,7 @@ export default function Expenses() {
     fetchData();
   };
 
-  const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatCurrency = (val) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val) : 'R$ ****';
   const formatDate = (dateString) => {
     const d = new Date(dateString);
     d.setMinutes(d.getMinutes() + d.getTimezoneOffset());

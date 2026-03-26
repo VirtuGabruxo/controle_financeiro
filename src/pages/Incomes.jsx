@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Plus, DollarSign, Loader2, Trash2 } from 'lucide-react';
 
 export default function Incomes() {
-  const { user } = useAuth();
+  const { user, showBalances } = useAuth();
   const [incomes, setIncomes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,7 +67,7 @@ export default function Incomes() {
     if (!error) fetchIncomes();
   };
 
-  const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  const formatCurrency = (value) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value) : 'R$ ****';
   const formatDate = (dateString) => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(dateString));
 
   return (
