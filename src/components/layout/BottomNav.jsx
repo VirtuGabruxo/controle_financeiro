@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, DollarSign, CreditCard, Settings as SettingsIcon, Target, PieChart, LineChart } from 'lucide-react';
+import { Home, DollarSign, CreditCard, Settings as SettingsIcon, Target, PieChart, LineChart, FileDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function BottomNav() {
@@ -13,6 +13,7 @@ export default function BottomNav() {
     { name: 'Metas', path: '/goals', icon: Target },
     { name: 'Relatórios', path: '/reports', icon: PieChart },
     { name: 'Balanço', path: '/net-worth', icon: LineChart },
+    { name: 'Exportar', path: '/export', icon: FileDown },
     { name: 'Config', path: '/settings', icon: SettingsIcon },
   ];
 
