@@ -202,9 +202,9 @@ export default function Reports() {
              <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted font-medium">Período (Início e Fim)</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-content text-xs focus:ring-1 focus:ring-cyan-500" />
-                    <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-2 py-2 text-content text-xs focus:ring-1 focus:ring-cyan-500" />
+                  <div className="flex flex-col gap-2">
+                    <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2 text-content text-sm focus:ring-1 focus:ring-cyan-500 [color-scheme:dark]" />
+                    <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2 text-content text-sm focus:ring-1 focus:ring-cyan-500 [color-scheme:dark]" />
                   </div>
                 </div>
 

@@ -68,7 +68,10 @@ export const AuthProvider = ({ children }) => {
   const signUp = async (email, password) => supabase.auth.signUp({ email, password });
   const signIn = async (email, password) => supabase.auth.signInWithPassword({ email, password });
   const signOut = async () => supabase.auth.signOut();
-  const resetPassword = async (email) => supabase.auth.resetPasswordForEmail(email, { redirectTo: 'http://localhost:5173/update-password' });
+  const resetPassword = async (email) => {
+    const redirectTo = `${window.location.origin}/update-password`;
+    return supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  };
   const updatePassword = async (password) => supabase.auth.updateUser({ password });
 
   return (

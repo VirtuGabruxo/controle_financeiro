@@ -6,6 +6,9 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as PieTooltip, BarCha
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
+const fmtBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+const fmtBRLShort = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+
 export default function Dashboard() {
   const { user, profile, showBalances } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -211,12 +214,17 @@ export default function Dashboard() {
         </h3>
         <div className="h-48 sm:h-64 md:h-72 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={evolutionData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+            <BarChart data={evolutionData} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis dataKey="name" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => showBalances ? `R$ ${val}` : '**'} />
-              <BarTooltip cursor={{ fill: '#27272a', opacity: 0.4 }} contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#f4f4f5' }} itemStyle={{ color: '#fb7185', fontWeight: 'bold' }} />
-              <Bar dataKey="total" fill="#fb7185" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <YAxis stroke="#a1a1aa" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => showBalances ? fmtBRLShort(val) : '****'} width={80} />
+              <BarTooltip
+                cursor={{ fill: '#27272a', opacity: 0.4 }}
+                contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '12px', color: '#f4f4f5' }}
+                itemStyle={{ color: '#fb7185', fontWeight: 'bold' }}
+                formatter={(value, name) => [showBalances ? fmtBRL(value) : 'R$ ****', 'Gastos']}
+              />
+              <Bar dataKey="total" name="Gastos" fill="#fb7185" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, DollarSign, CreditCard, LogOut, Settings as SettingsIcon, Eye, EyeOff, Target, PieChart, LineChart } from 'lucide-react';
+import { Home, DollarSign, CreditCard, LogOut, Settings as SettingsIcon, Eye, EyeOff, Target, PieChart, LineChart, FileDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -15,6 +15,7 @@ export default function Sidebar() {
     { name: 'Caixinhas & Metas', path: '/goals', icon: Target },
     { name: 'Relatórios', path: '/reports', icon: PieChart },
     { name: 'Balanço Geral', path: '/net-worth', icon: LineChart },
+    { name: 'Exportar Dados', path: '/export', icon: FileDown },
   ];
 
   return (

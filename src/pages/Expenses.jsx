@@ -275,7 +275,7 @@ export default function Expenses() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-muted">{expenseType==='fixed'?'Dia do Vencimento':'Data'}</label>
-                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm text-center" />
+                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
               </div>
             </div>
 

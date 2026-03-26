@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, User, Lock, Download, AlertTriangle, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell, Edit2, X, Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Check, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill } from 'lucide-react';
+import { Save, User, Lock, AlertTriangle, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell, Edit2, X, Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Check, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export const ICON_MAP = { Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill };
@@ -31,7 +31,8 @@ export default function Settings() {
   const [categories, setCategories] = useState([]);
   const [catForm, setCatForm] = useState(EMPTY_FORM);
   const [showCatModal, setShowCatModal] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [clearConfirm, setClearConfirm] = useState('');
+  const [deleteAccConfirm, setDeleteAccConfirm] = useState('');
   const [dangerLoading, setDangerLoading] = useState(false);
 
   useEffect(() => { fetchData(); }, [user]);
@@ -109,35 +110,18 @@ export default function Settings() {
     fetchData();
   };
 
-  const handleExportCSV = async () => {
-    const { data: incomes } = await supabase.from('incomes').select('*, categories(name)').eq('user_id', user.id);
-    const { data: expenses } = await supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id);
-    let csvData = 'Tipo;Data;Descrição;Categoria;Valor\n';
-    incomes?.forEach(i => {
-      const val = i.net_amount !== undefined ? i.net_amount : (i.gross_amount - (i.discounts||0));
-      csvData += `Receita;${i.month};"${i.description}";${i.categories?.name || 'Geral'};${val.toString().replace('.',',')}\n`;
-    });
-    expenses?.forEach(e => {
-      csvData += `Despesa;${e.expense_date};"${e.description}";${e.categories?.name || 'Geral'};${e.amount.toString().replace('.',',')}\n`;
-    });
-    const blob = new Blob(['\ufeff' + csvData], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `extrato_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-  };
 
   const handleClearData = async () => {
-    if (deleteConfirm !== 'CONFIRMAR LIMPEZA') return alert('Digite CONFIRMAR LIMPEZA para prosseguir.');
+    if (clearConfirm !== 'CONFIRMAR LIMPEZA') return alert('Digite CONFIRMAR LIMPEZA para prosseguir.');
     setDangerLoading(true);
     await supabase.from('incomes').delete().eq('user_id', user.id);
     await supabase.from('expenses').delete().eq('user_id', user.id);
-    setDangerLoading(false); setDeleteConfirm('');
+    setDangerLoading(false); setClearConfirm('');
     alert('Todos os lançamentos foram excluídos.');
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirm !== 'DELETAR CONTA') return alert('Digite DELETAR CONTA para prosseguir.');
+    if (deleteAccConfirm !== 'CONFIRMAR EXCLUSÃO') return alert('Digite CONFIRMAR EXCLUSÃO para prosseguir.');
     if (window.confirm('Tem certeza ABSOLUTA? Esta ação é irreversível.')) {
       setDangerLoading(true);
       await supabase.rpc('delete_my_account');
@@ -151,7 +135,7 @@ export default function Settings() {
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-primary-glow">Configurações</h1>
-        <p className="text-muted mt-1">Gerencie seu perfil, preferências e exporte dados.</p>
+        <p className="text-muted mt-1">Gerencie seu perfil, preferências e categorias.</p>
       </div>
 
       {/* ── INTERFACE & THEMES ── full width */}
@@ -325,22 +309,25 @@ export default function Settings() {
       {/* ── DANGER ZONE ── full width */}
       <section className="bg-red-950/10 border border-red-900/40 rounded-2xl p-6">
         <h2 className="text-xl font-semibold text-red-500 flex items-center gap-2 mb-6"><AlertTriangle size={20} /> Zona de Perigo</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <h3 className="font-medium text-content">Exportar Dados</h3>
-            <p className="text-sm text-muted mb-3">Baixe um CSV com todas as suas transações.</p>
-            <button onClick={handleExportCSV} className="bg-border hover:bg-surface text-content px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
-              <Download size={16} /> Baixar Extrato CSV
-            </button>
-          </div>
-          <div className="border-t md:border-t-0 border-red-900/20 pt-6 md:pt-0">
-            <h3 className="font-medium text-red-400">Ações Destrutivas</h3>
-            <p className="text-sm text-muted mb-4">Estas ações não podem ser desfeitas. Confirme digitando abaixo:</p>
-            <input type="text" placeholder='Ex: "CONFIRMAR LIMPEZA"' value={deleteConfirm} onChange={e => setDeleteConfirm(e.target.value)} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-4 py-2 text-content focus:outline-none focus:border-red-500 mb-4 text-sm uppercase" />
-            <div className="flex gap-3">
-              <button onClick={handleClearData} disabled={dangerLoading || deleteConfirm !== 'CONFIRMAR LIMPEZA'} className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Zerar Transações</button>
-              <button onClick={handleDeleteAccount} disabled={dangerLoading || deleteConfirm !== 'DELETAR CONTA'} className="flex-1 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Excluir Conta</button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl">
+          {/* Zerar Transações */}
+          <div className="p-4 rounded-xl border border-red-900/30 bg-red-950/10 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-content">Zerar Transações</p>
+              <p className="text-xs text-muted mt-1">Remove todas as receitas e despesas. Digite <span className="font-mono font-bold text-red-400">CONFIRMAR LIMPEZA</span> para habilitar.</p>
             </div>
+            <input type="text" placeholder="CONFIRMAR LIMPEZA" value={clearConfirm} onChange={e => setClearConfirm(e.target.value.toUpperCase())} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-3 py-2 text-content focus:outline-none focus:border-red-500 text-sm font-mono" />
+            <button onClick={handleClearData} disabled={dangerLoading || clearConfirm !== 'CONFIRMAR LIMPEZA'} className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Zerar Transações</button>
+          </div>
+
+          {/* Excluir Conta */}
+          <div className="p-4 rounded-xl border border-red-900/30 bg-red-950/10 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-content">Excluir Conta</p>
+              <p className="text-xs text-muted mt-1">Apaga sua conta permanentemente. Digite <span className="font-mono font-bold text-red-400">CONFIRMAR EXCLUSÃO</span> para habilitar.</p>
+            </div>
+            <input type="text" placeholder="CONFIRMAR EXCLUSÃO" value={deleteAccConfirm} onChange={e => setDeleteAccConfirm(e.target.value.toUpperCase())} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-3 py-2 text-content focus:outline-none focus:border-red-500 text-sm font-mono" />
+            <button onClick={handleDeleteAccount} disabled={dangerLoading || deleteAccConfirm !== 'CONFIRMAR EXCLUSÃO'} className="w-full bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Excluir Conta</button>
           </div>
         </div>
       </section>
