@@ -6,7 +6,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis
 import { cn } from '../lib/utils';
 
 export default function Reports() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
   
   // Core Filter Data
   const defaultStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -43,13 +43,16 @@ export default function Reports() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [user, filters]);
+    if (activeGroupId) {
+      fetchData();
+    }
+  }, [user, filters, activeGroupId]);
 
   const fetchOptions = async () => {
-    const { data: cat } = await supabase.from('categories').select('id, name').or(`user_id.eq.${user.id},user_id.is.null`);
+    if (!activeGroupId) return;
+    const { data: cat } = await supabase.from('categories').select('id, name').or(`grupo_id.eq.${activeGroupId},user_id.is.null`);
     if(cat) setCategoriesList(cat);
-    const { data: crd } = await supabase.from('cards').select('id, name');
+    const { data: crd } = await supabase.from('cards').select('id, name').eq('grupo_id', activeGroupId);
     if(crd) setCardsList(crd);
   };
 
@@ -64,6 +67,7 @@ export default function Reports() {
       if (type === 'expenses' || type === 'both') {
         let q = supabase.from('expenses')
            .select('id, amount, description, expense_date, card_id, categories(id, name, color), cards(name)')
+           .eq('grupo_id', activeGroupId)
            .gte('expense_date', startDate)
            .lte('expense_date', endDate + 'T23:59:59');
 
@@ -81,6 +85,7 @@ export default function Reports() {
       if (type === 'incomes' || type === 'both') {
         const { data } = await supabase.from('incomes')
            .select('id, description, type, gross_amount, discounts, net_amount, month')
+           .eq('grupo_id', activeGroupId)
            .gte('month', startDate)
            .lte('month', endDate + 'T23:59:59');
         

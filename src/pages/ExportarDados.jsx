@@ -49,7 +49,7 @@ const fmtBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', curren
 const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
 
 export default function ExportarDados() {
-  const { user } = useAuth();
+  const { user, activeGroupId } = useAuth();
   const [csvLoading, setCsvLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [period, setPeriod] = useState('this_month');
@@ -60,8 +60,8 @@ export default function ExportarDados() {
   const handleExportCSV = async () => {
     setCsvLoading(true);
     try {
-      const { data: incomes } = await supabase.from('incomes').select('*, categories(name)').eq('user_id', user.id);
-      const { data: expenses } = await supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id);
+      const { data: incomes } = await supabase.from('incomes').select('*, categories(name)').eq('grupo_id', activeGroupId);
+      const { data: expenses } = await supabase.from('expenses').select('*, categories(name)').eq('grupo_id', activeGroupId);
 
       let csv = 'Tipo;Data;Descrição;Categoria;Valor\n';
       incomes?.forEach(i => {
@@ -96,7 +96,7 @@ export default function ExportarDados() {
       const { data: expenses } = await supabase
         .from('expenses')
         .select('description, amount, expense_date, categories(name)')
-        .eq('user_id', user.id)
+        .eq('grupo_id', activeGroupId)
         .gte('expense_date', startDate)
         .lte('expense_date', endDate + 'T23:59:59')
         .order('expense_date', { ascending: true });
@@ -104,7 +104,7 @@ export default function ExportarDados() {
       const { data: incomes } = await supabase
         .from('incomes')
         .select('description, gross_amount, discounts, net_amount, month, categories(name)')
-        .eq('user_id', user.id)
+        .eq('grupo_id', activeGroupId)
         .gte('month', startDate)
         .lte('month', endDate + 'T23:59:59')
         .order('month', { ascending: true });

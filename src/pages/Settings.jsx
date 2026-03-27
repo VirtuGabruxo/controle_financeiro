@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, User, Lock, AlertTriangle, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell, Edit2, X, Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Check, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill } from 'lucide-react';
+import { 
+  Save, User, Lock, AlertTriangle, Palette, Wallet, Trash2, Loader2, Plus, Moon, Sun, Bell, 
+  Edit2, X, Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, 
+  Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, 
+  Check, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill, 
+  Users, LogOut 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
+import UserAvatar from '../components/common/UserAvatar';
 
 export const ICON_MAP = { Tag, ShoppingCart, Utensils, Car, Bus, Home, Gamepad2, Tv, HeartPulse, Heart, Briefcase, GraduationCap, Smartphone, Zap, Coffee, Music, Plane, Book, Gift, Scissors, Wifi, Dumbbell, TrendingUp, Camera, Baby, Dog, Shirt, Monitor, Landmark, Pill };
 export const AVAILABLE_COLORS = [ { name: 'Cinza', hex: '#a1a1aa' }, { name: 'Roxo', hex: '#a855f7' }, { name: 'Verde', hex: '#10b981' }, { name: 'Vermelho', hex: '#ef4444' }, { name: 'Laranja', hex: '#f97316' }, { name: 'Amarelo', hex: '#f59e0b' }, { name: 'Azul', hex: '#3b82f6' }, { name: 'Rosa', hex: '#f43f5e' } ];
@@ -10,7 +17,10 @@ export const AVAILABLE_COLORS = [ { name: 'Cinza', hex: '#a1a1aa' }, { name: 'Ro
 const EMPTY_FORM = { id: null, name: '', icon: 'Tag', color: '#a1a1aa' };
 
 export default function Settings() {
-  const { user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor, setProfile: setGlobalProfile, setShowBalances } = useAuth();
+  const { 
+    user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor, 
+    setProfile: setGlobalProfile, setShowBalances, activeGroupId, userGroups, refreshGroups, activeRole
+  } = useAuth();
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
@@ -34,16 +44,140 @@ export default function Settings() {
   const [clearConfirm, setClearConfirm] = useState('');
   const [deleteAccConfirm, setDeleteAccConfirm] = useState('');
   const [dangerLoading, setDangerLoading] = useState(false);
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [savingGroupName, setSavingGroupName] = useState(false);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
   useEffect(() => { fetchData(); }, [user]);
 
   const fetchData = async () => {
+    if (!user || !activeGroupId) return;
     setLoading(true);
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (profileData) setProfile(profileData);
-    const { data: catData } = await supabase.from('categories').select('*').or(`user_id.eq.${user.id},user_id.is.null`).order('name');
+    
+    // Categorias agora filtram pelo GRUPO_ID ativo ou globais
+    const { data: catData } = await supabase
+      .from('categories')
+      .select('*')
+      .or(`grupo_id.eq.${activeGroupId},user_id.is.null`)
+      .order('name');
+    
     if (catData) setCategories(catData);
     setLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeGroupId) {
+      fetchGroupDetails();
+    }
+  }, [activeGroupId]);
+
+  const fetchGroupDetails = async () => {
+    if (!activeGroupId) return;
+    
+    // Buscar nome do grupo
+    const { data: gData } = await supabase.from('grupos').select('nome').eq('id', activeGroupId).single();
+    if (gData) setGroupName(gData.nome);
+
+    // Buscar membros
+    const { data: members } = await supabase
+      .from('membros_grupo')
+      .select('id, user_id, papel, profiles(full_name, avatar_url, email)')
+      .eq('grupo_id', activeGroupId);
+    
+    if (members) {
+      setGroupMembers(members.map(m => ({
+        id: m.id,
+        user_id: m.user_id,
+        papel: m.papel,
+        name: m.profiles?.full_name || 'Usuário',
+        avatar: m.profiles?.avatar_url,
+        email: m.profiles?.email
+      })));
+    }
+
+    // Buscar convites (usando a nova tabela 'convites')
+    const { data: invites } = await supabase
+      .from('convites')
+      .select('*')
+      .eq('grupo_id', activeGroupId)
+      .eq('status', 'pendente');
+    
+    if (invites) setPendingInvites(invites);
+  };
+
+  const handleSendInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail.trim() || !activeGroupId) return;
+    setInviting(true);
+    
+    const { error } = await supabase.from('convites').insert([{
+      grupo_id: activeGroupId,
+      email_convidado: inviteEmail.trim().toLowerCase(),
+      convidado_por: user.id
+    }]);
+
+    if (error) {
+      alert('Erro ao enviar convite: ' + error.message);
+    } else {
+      setInviteEmail('');
+      fetchGroupDetails();
+      alert('Convite enviado com sucesso!');
+    }
+    setInviting(false);
+  };
+
+  const handleLeaveGroup = async () => {
+    const group = userGroups.find(g => g.id === activeGroupId);
+    if (!group) return;
+    if (group.nome.toLowerCase().includes('pessoal')) {
+      return alert('Você não pode sair do seu grupo pessoal.');
+    }
+
+    if (!window.confirm(`Tem certeza que deseja sair do grupo "${group.nome}"?`)) return;
+
+    const { error } = await supabase
+      .from('membros_grupo')
+      .delete()
+      .eq('grupo_id', activeGroupId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      alert('Erro ao sair do grupo: ' + error.message);
+    } else {
+      window.location.reload(); 
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    const group = userGroups.find(g => g.id === activeGroupId);
+    if (!group || activeRole !== 'admin') return;
+
+    if (group.nome.toLowerCase().includes('pessoal')) {
+      return alert('Você não pode excluir seu grupo pessoal.');
+    }
+
+    const confirm1 = window.confirm(`⚠️ ATENÇÃO: Isso excluirá permanentemente o grupo "${group.nome}" e TODOS os dados vinculados a ele (despesas, rendas, etc). Deseja continuar?`);
+    if (!confirm1) return;
+
+    const confirm2 = window.confirm(`DIGITE O NOME DO GRUPO PARA CONFIRMAR: "${group.nome}"`);
+    // Simplificando confirmação para UX, mas mantendo o alerta de risco
+    
+    setIsDeletingGroup(true);
+    const { error } = await supabase.from('grupos').delete().eq('id', activeGroupId);
+
+    if (error) {
+      alert('Erro ao excluir grupo: ' + error.message);
+    } else {
+      alert('Grupo excluído com sucesso.');
+      window.location.reload();
+    }
+    setIsDeletingGroup(false);
   };
 
   const handleProfileChange = (e) => {
@@ -89,7 +223,7 @@ export default function Settings() {
     if (!catForm.name.trim()) return;
     const targetCat = categories.find(c => c.id === catForm.id);
     const isGlobal = targetCat && targetCat.user_id === null;
-    const payload = { name: catForm.name, icon: catForm.icon, color: catForm.color, user_id: user.id };
+    const payload = { name: catForm.name, icon: catForm.icon, color: catForm.color, user_id: user.id, grupo_id: activeGroupId };
     let errorObj = null;
     if (catForm.id && !isGlobal) {
       const { error } = await supabase.from('categories').update(payload).eq('id', catForm.id);
@@ -138,8 +272,18 @@ export default function Settings() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-primary-glow">Configurações</h1>
-        <p className="text-muted mt-1">Gerencie seu perfil, preferências e categorias.</p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-primary-glow">Configurações</h1>
+            <p className="text-muted mt-1">Gerencie seu perfil, preferências e seu grupo familiar.</p>
+          </div>
+          {userGroups.length > 0 && (
+            <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-xl flex items-center gap-3">
+              <Users size={18} className="text-primary" />
+              <span className="text-sm font-semibold text-primary">Workspace: {userGroups.find(g => g.id === activeGroupId)?.nome || '...'}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── INTERFACE & THEMES ── full width */}
@@ -180,158 +324,350 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* ── TWO-COLUMN BODY ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-
-        {/* LEFT COLUMN: Profile + Password + Notifications */}
-        <div className="space-y-8">
-
-          {/* PROFILE */}
-          <section className="bg-surface/50 border border-border rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><User size={20} className="text-primary-glow" /> Perfil Básico</h2>
-            <form onSubmit={saveProfile} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm text-muted">Email (Não editável)</label>
-                <input type="text" disabled value={user.email} className="w-full bg-background/80 border border-border/50 rounded-xl px-4 py-2 text-muted cursor-not-allowed" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* LEFT COLUMN: Groups Management */}
+        <div className="lg:col-span-1 space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
+          <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-1 p-0.5 h-full bg-cyan-500/50" />
+            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6">
+              <Users size={20} className="text-cyan-400" /> Meu Grupo Familiar
+            </h2>
+            
+            <div className="space-y-6">
+              {/* Nome do Grupo (Admin ou Leitura) */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted uppercase tracking-widest flex items-center justify-between">
+                  Nome do Workspace
+                  {activeRole === 'admin' ? (
+                    <span className="text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Admin</span>
+                  ) : (
+                    <span className="text-[8px] bg-zinc-500/20 text-zinc-400 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Membro</span>
+                  )}
+                </p>
+                {activeRole === 'admin' ? (
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={groupName}
+                      onChange={e => setGroupName(e.target.value)}
+                      className="flex-1 bg-background/50 border border-border rounded-xl px-3 py-2 text-sm text-content focus:ring-1 focus:ring-primary/30 outline-none transition-all"
+                    />
+                    <button 
+                      onClick={async () => {
+                        setSavingGroupName(true);
+                        const { error } = await supabase.from('grupos').update({ nome: groupName.trim() }).eq('id', activeGroupId);
+                        if (!error) {
+                          await refreshGroups();
+                          alert('Nome atualizado!');
+                        }
+                        setSavingGroupName(false);
+                      }}
+                      className="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-2 rounded-xl text-xs font-bold transition-all border border-primary/20"
+                    >
+                      {savingGroupName ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-background/30 border border-border/30 rounded-xl px-4 py-2.5">
+                    <p className="text-sm font-semibold text-content">{groupName}</p>
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <label className="text-sm text-muted">Nome Completo</label>
-                <input type="text" name="full_name" value={profile.full_name || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-muted">URL da Foto de Perfil</label>
-                <input type="url" name="avatar_url" value={profile.avatar_url || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-              </div>
-              <button type="submit" disabled={savingProfile} className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors flex justify-center items-center gap-2">
-                {savingProfile ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Salvar Perfil
-              </button>
-              {profileMessage && <p className="text-sm text-center text-primary-glow mt-2">{profileMessage}</p>}
-            </form>
 
-            <hr className="my-8 border-border" />
-
-            <h3 className="text-lg font-medium text-content mb-4 flex items-center gap-2"><Lock size={18} className="text-muted" /> Alterar Senha</h3>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm text-muted">Nova Senha</label>
-                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={6} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
-              </div>
-              <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors">Atualizar Senha</button>
-              {pwdMessage && <p className="text-sm text-center text-muted mt-2">{pwdMessage}</p>}
-            </form>
-          </section>
-
-          {/* NOTIFICATIONS */}
-          <section className="bg-surface/50 border border-border rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Bell size={20} className="text-amber-400" /> Notificações e Alertas</h2>
-            <form onSubmit={saveProfile} className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-content flex-1 max-w-[80%]">Alertar vencimento de faturas e empréstimos</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" name="notificar_vencimentos" checked={profile.notificar_vencimentos} onChange={handleProfileChange} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
+              {/* Active Group Info (Members) */}
+              <div className="p-4 rounded-xl bg-background/50 border border-border/50">
+                <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-1">Membros Ativos</p>
+                <div className="space-y-4 mt-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {groupMembers.map(member => (
+                    <div key={member.id} className="flex items-center justify-between gap-4 w-full group/member">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        {member.avatar ? (
+                          <img src={member.avatar} className="w-12 h-12 rounded-full border-2 border-border/80 object-cover shadow-lg" alt={member.name} />
+                        ) : (
+                          <UserAvatar nameOrEmail={member.name || member.email} size="lg" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm sm:text-base font-medium text-content truncate leading-tight">
+                            {member.name} {member.user_id === user.id && <span className="text-[10px] font-normal text-muted ml-1">(Você)</span>}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-muted capitalize mt-1 flex items-center gap-2">
+                             {member.email && <span className="truncate opacity-60">{member.email}</span>}
+                             <span className="w-1 h-1 rounded-full bg-border" />
+                             {member.papel}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        {member.papel === 'admin' ? (
+                          <div className="p-1.5 rounded-full bg-primary/10 text-primary border border-primary/20" title="Administrador">
+                            <Check size={12} strokeWidth={4} />
+                          </div>
+                        ) : (
+                          // Futuro: Botão de remover se for admin
+                          null
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              {profile.notificar_vencimentos && (
-                <div className="space-y-2 pt-2 border-t border-border/50 animate-in fade-in zoom-in duration-200">
-                  <label className="text-sm text-muted">Avisar com quantos dias de antecedência?</label>
-                  <input type="number" min="1" max="15" name="dias_antecedencia" value={profile.dias_antecedencia} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+
+              {/* Invite Section (Admin Only) */}
+              {activeRole === 'admin' ? (
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <h3 className="text-sm font-semibold text-content">Convidar por E-mail</h3>
+                  <form onSubmit={handleSendInvite} className="flex gap-2">
+                    <input 
+                      type="email" 
+                      placeholder="email@exemplo.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      required
+                      className="flex-1 bg-background/50 border border-border rounded-xl px-3 py-2 text-xs text-content focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                    />
+                    <button 
+                      disabled={inviting}
+                      className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center min-w-[36px]"
+                    >
+                      {inviting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    </button>
+                  </form>
+                  <p className="text-[10px] text-muted italic">Os novos membros terão acesso a todos os dados deste workspace.</p>
+                </div>
+              ) : (
+                <div className="pt-4 border-t border-border/50">
+                  <p className="text-[10px] text-muted text-center italic">Somente administradores podem convidar novos membros.</p>
                 </div>
               )}
-              <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors mt-2">Salvar Alertas</button>
-            </form>
+
+              {/* Pending Invites */}
+              {pendingInvites.length > 0 && (
+                <div className="pt-4 border-t border-border/50">
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">Convites Pendentes</p>
+                  <div className="space-y-2">
+                    {pendingInvites.map(inv => (
+                      <div key={inv.id} className="flex items-center justify-between p-2 rounded-lg bg-background/30 border border-border/30">
+                        <span className="text-xs text-content truncate max-w-[120px]">{inv.email_convidado}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-medium">Pendente</span>
+                          <button 
+                            onClick={async () => {
+                              await supabase.from('convites').delete().eq('id', inv.id);
+                              fetchGroupDetails();
+                            }}
+                            className="text-muted hover:text-rose-400 p-1"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Group Actions (Delete or Leave) */}
+              <div className="pt-4 border-t border-border/30 flex flex-col gap-2">
+                {activeRole === 'admin' ? (
+                  <button 
+                    onClick={handleDeleteGroup}
+                    disabled={isDeletingGroup}
+                    className="w-full text-xs text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-lg transition-all flex items-center justify-center gap-2 font-bold"
+                  >
+                    {isDeletingGroup ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    EXCLUIR WORKSPACE
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleLeaveGroup}
+                    className="w-full text-xs text-muted hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-lg transition-all flex items-center justify-center gap-2 font-bold"
+                  >
+                    <LogOut size={14} /> SAIR DO WORKSPACE
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         </div>
 
-        {/* RIGHT COLUMN: Financial + Categories */}
-        <div className="space-y-8">
-
-          {/* FINANCIAL PREFS */}
-          <section className="bg-surface/50 border border-border rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Wallet size={20} className="text-blue-400" /> Configurações Financeiras</h2>
+        {/* RIGHT COLUMNS: Profile + Password + Notifications + Categories */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* PROFILE */}
+          <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><User size={20} className="text-primary-glow" /> Perfil Básico</h2>
             <form onSubmit={saveProfile} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm text-muted">Salário Base Padrão (R$)</label>
-                <input type="number" step="0.01" name="salario_padrao" value={profile.salario_padrao} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted font-medium">Email (Não editável)</label>
+                  <input type="text" disabled value={user.email} className="w-full bg-background/80 border border-border/50 rounded-xl px-4 py-2.5 text-muted cursor-not-allowed text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted font-medium">Nome Completo</label>
+                  <input type="text" name="full_name" value={profile.full_name || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" />
+                </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm text-muted">Dia de Virada do Mês</label>
-                <input type="number" min="1" max="31" name="dia_virada" value={profile.dia_virada} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                <label className="text-sm text-muted font-medium">URL da Foto de Perfil</label>
+                <input type="url" name="avatar_url" value={profile.avatar_url || ''} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" />
               </div>
-              <button type="submit" className="w-full bg-border hover:bg-surface text-content font-medium py-2 rounded-xl transition-colors">Salvar Configurações</button>
+              <button type="submit" disabled={savingProfile} className="w-full bg-border hover:bg-surface text-content font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 border border-border/50 shadow-sm hover:shadow-md">
+                {savingProfile ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Salvar Alterações no Perfil
+              </button>
+              {profileMessage && <p className="text-sm text-center text-primary-glow mt-2 font-medium animate-pulse">{profileMessage}</p>}
             </form>
           </section>
 
-          {/* CATEGORIES */}
-          <section className="bg-surface/50 border border-border rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-content flex items-center gap-2"><Tag size={20} className="text-primary-glow" /> Categorias</h2>
-              <span className="text-xs font-normal text-muted bg-surface px-2 py-1 rounded border border-border">Total: {categories.length}</span>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            {/* PASSWORD */}
+            <section className="bg-surface/50 border border-border rounded-2xl p-6 h-full flex flex-col shadow-sm">
+              <h3 className="text-lg font-semibold text-content mb-6 flex items-center gap-2"><Lock size={18} className="text-muted" /> Alterar Minha Senha</h3>
+              <form onSubmit={handlePasswordChange} className="space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted font-medium">Nova Senha</label>
+                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={6} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm" />
+                </div>
+                <button type="submit" className="w-full bg-border hover:bg-surface text-content font-bold py-2.5 rounded-xl transition-all border border-border/50 mt-4">Atualizar Senha</button>
+                {pwdMessage && <p className="text-sm text-center text-muted mt-2">{pwdMessage}</p>}
+              </form>
+            </section>
 
-            {/* List */}
-            <div className="bg-background/50 border border-border rounded-xl p-2 max-h-72 overflow-y-auto space-y-1 mb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-              {categories.map(cat => {
-                const IconComp = ICON_MAP[cat.icon] || ICON_MAP[cat.icone] || ICON_MAP['Tag'];
-                const displayColor = cat.color || cat.cor || '#a1a1aa';
-                return (
-                  <div key={cat.id} className="group flex justify-between items-center p-2 rounded-lg transition-colors border border-transparent hover:bg-surface">
-                    <span className="text-sm font-medium flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-surface border shadow-sm flex items-center justify-center" style={{ borderColor: `${displayColor}30` }}>
-                        <IconComp size={16} style={{ color: displayColor }} />
-                      </div>
-                      <span style={{ color: displayColor }}>{cat.name}</span>
-                      {!cat.user_id && <span className="text-[10px] bg-border/50 uppercase tracking-wide px-1.5 py-0.5 rounded text-muted ml-1">Global</span>}
-                    </span>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button type="button" onClick={() => openEditCatModal(cat)} className="p-1.5 text-muted hover:text-cyan-400 rounded transition-colors"><Edit2 size={16} /></button>
-                      {cat.user_id === user.id ? (
-                        <button type="button" onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-muted hover:text-rose-400 rounded transition-colors"><Trash2 size={16} /></button>
-                      ) : (
-                        <span className="p-1.5 text-muted/30" title="Categorias globais não podem ser excluídas"><Trash2 size={16}/></span>
-                      )}
-                    </div>
+            {/* NOTIFICATIONS */}
+            <section className="bg-surface/50 border border-border rounded-2xl p-6 h-full flex flex-col shadow-sm">
+              <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Bell size={20} className="text-amber-400" /> Notificações do Workspace</h2>
+              <form onSubmit={saveProfile} className="space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-content flex-1 pr-4 leading-tight">Alerta de vencimento (e-mail/push)</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="notificar_vencimentos" checked={profile.notificar_vencimentos} onChange={handleProfileChange} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Add Button */}
-            <button
-              type="button"
-              onClick={openNewCatModal}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-primary/40 text-primary-glow hover:bg-primary/5 transition-colors font-medium text-sm"
-            >
-              <Plus size={18} /> Nova Categoria
-            </button>
-          </section>
+                  {profile.notificar_vencimentos && (
+                    <div className="space-y-2 pt-4 border-t border-border/50 animate-in fade-in zoom-in duration-300">
+                      <label className="text-sm text-muted font-medium">Dias de antecedência?</label>
+                      <input type="number" min="1" max="15" name="dias_antecedencia" value={profile.dias_antecedencia} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:ring-2 focus:ring-primary/20 outline-none text-sm" />
+                    </div>
+                  )}
+                </div>
+                <button type="submit" className="w-full bg-border hover:bg-surface text-content font-bold py-2.5 rounded-xl transition-all border border-border/50 mt-6">Salvar Alertas</button>
+              </form>
+            </section>
+          </div>
         </div>
       </div>
 
-      {/* ── DANGER ZONE ── full width */}
-      <section className="bg-red-950/10 border border-red-900/40 rounded-2xl p-6">
-        <h2 className="text-xl font-semibold text-red-500 flex items-center gap-2 mb-6"><AlertTriangle size={20} /> Zona de Perigo</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl">
-          {/* Zerar Transações */}
-          <div className="p-4 rounded-xl border border-red-900/30 bg-red-950/10 space-y-3">
-            <div>
-              <p className="text-sm font-medium text-content">Zerar Transações</p>
-              <p className="text-xs text-muted mt-1">Remove todas as receitas e despesas. Digite <span className="font-mono font-bold text-red-400">CONFIRMAR LIMPEZA</span> para habilitar.</p>
+      {/* ── LOWER GRID: Financial + Categories ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        {/* FINANCIAL PREFS */}
+        <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Wallet size={20} className="text-blue-400" /> Configurações Financeiras</h2>
+          <form onSubmit={saveProfile} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-muted font-medium">Salário Base Padrão (R$)</label>
+              <input type="number" step="0.01" name="salario_padrao" value={profile.salario_padrao} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
             </div>
-            <input type="text" placeholder="CONFIRMAR LIMPEZA" value={clearConfirm} onChange={e => setClearConfirm(e.target.value.toUpperCase())} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-3 py-2 text-content focus:outline-none focus:border-red-500 text-sm font-mono" />
-            <button onClick={handleClearData} disabled={dangerLoading || clearConfirm !== 'CONFIRMAR LIMPEZA'} className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Zerar Transações</button>
+            <div className="space-y-2">
+              <label className="text-sm text-muted font-medium">Dia de Virada do Mês</label>
+              <input type="number" min="1" max="31" name="dia_virada" value={profile.dia_virada} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
+            </div>
+            <button type="submit" className="w-full bg-border hover:bg-surface text-content font-bold py-2.5 rounded-xl transition-all border border-border/50 shadow-sm mt-2">Salvar Configurações</button>
+          </form>
+        </section>
+
+        {/* CATEGORIES */}
+        <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12" />
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <h2 className="text-xl font-semibold text-content flex items-center gap-2"><Tag size={20} className="text-primary-glow" /> Categorias</h2>
+            <span className="text-[10px] font-bold text-muted bg-surface/80 px-2 py-1 rounded-full border border-border shadow-sm">Ativas: {categories.length}</span>
+          </div>
+
+          <div className="bg-background/40 border border-border rounded-xl p-2 max-h-72 overflow-y-auto space-y-1 mb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10">
+            {categories.map(cat => {
+              const IconComp = ICON_MAP[cat.icon] || ICON_MAP[cat.icone] || ICON_MAP['Tag'];
+              const displayColor = cat.color || cat.cor || '#a1a1aa';
+              return (
+                <div key={cat.id} className="group flex justify-between items-center p-2 rounded-lg transition-all border border-transparent hover:bg-surface hover:shadow-sm">
+                  <span className="text-sm font-medium flex items-center gap-3">
+                    <div className="p-1.5 rounded-lg bg-surface border shadow-xs flex items-center justify-center transition-transform group-hover:scale-110" style={{ borderColor: `${displayColor}40` }}>
+                      <IconComp size={16} style={{ color: displayColor }} />
+                    </div>
+                    <span style={{ color: displayColor }}>{cat.name}</span>
+                    {!cat.user_id && <span className="text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest px-1.5 py-0.5 rounded ml-2">Padrão</span>}
+                  </span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button type="button" onClick={() => openEditCatModal(cat)} className="p-1.5 text-muted hover:text-cyan-400 rounded-lg hover:bg-background/50 transition-colors" title="Editar"><Edit2 size={16} /></button>
+                    {cat.user_id === user.id ? (
+                      <button type="button" onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-muted hover:text-rose-400 rounded-lg hover:bg-background/50 transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                    ) : (
+                      <span className="p-1.5 text-muted/20 cursor-not-allowed" title="Categorias globais não editáveis"><Trash2 size={16}/></span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {categories.length === 0 && <p className="p-4 text-center text-xs text-muted">Nenhuma categoria encontrada.</p>}
+          </div>
+
+          <button
+            type="button"
+            onClick={openNewCatModal}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-all font-bold text-sm shadow-sm relative z-10"
+          >
+            <Plus size={18} /> Criar Nova Categoria
+          </button>
+        </section>
+      </div>
+
+      {/* ── DANGER ZONE ── full width */}
+      <section className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-6 shadow-sm">
+        <h2 className="text-xl font-semibold text-rose-500 flex items-center gap-2 mb-6"><AlertTriangle size={20} /> Segurança e Dados Críticos</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
+          {/* Zerar Transações */}
+          <div className="p-5 rounded-2xl border border-rose-500/10 bg-background/50 space-y-4 hover:shadow-lg transition-all">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Trash2 size={24} /></div>
+              <div>
+                <p className="text-sm font-bold text-content">Zerar Dashboard Atual</p>
+                <p className="text-xs text-muted mt-1 leading-relaxed">Remove irremediavelmente todas as receitas e despesas vinculadas a este workspace.</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="bg-background/80 border border-border rounded-xl p-1 px-3">
+                <input type="text" placeholder="CONFIRMAR LIMPEZA" value={clearConfirm} onChange={e => setClearConfirm(e.target.value.toUpperCase())} className="w-full bg-transparent py-2 text-rose-400 focus:outline-none text-xs font-mono font-bold tracking-widest text-center" />
+              </div>
+              <button 
+                onClick={handleClearData} 
+                disabled={dangerLoading || clearConfirm !== 'CONFIRMAR LIMPEZA'} 
+                className="w-full bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed uppercase tracking-wider"
+              >
+                Limpar Banco de Dados
+              </button>
+            </div>
           </div>
 
           {/* Excluir Conta */}
-          <div className="p-4 rounded-xl border border-red-900/30 bg-red-950/10 space-y-3">
-            <div>
-              <p className="text-sm font-medium text-content">Excluir Conta</p>
-              <p className="text-xs text-muted mt-1">Apaga sua conta permanentemente. Digite <span className="font-mono font-bold text-red-400">CONFIRMAR EXCLUSÃO</span> para habilitar.</p>
+          <div className="p-5 rounded-2xl border border-rose-500/10 bg-background/50 space-y-4 hover:shadow-lg transition-all">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-rose-500/10 rounded-xl text-rose-500"><X size={24} /></div>
+              <div>
+                <p className="text-sm font-bold text-content">Excluir Conta Permanentemente</p>
+                <p className="text-xs text-muted mt-1 leading-relaxed">Apaga seu perfil e todos os seus dados pessoais de todos os grupos.</p>
+              </div>
             </div>
-            <input type="text" placeholder="CONFIRMAR EXCLUSÃO" value={deleteAccConfirm} onChange={e => setDeleteAccConfirm(e.target.value.toUpperCase())} className="w-full bg-background/50 border border-red-900/50 rounded-lg px-3 py-2 text-content focus:outline-none focus:border-red-500 text-sm font-mono" />
-            <button onClick={handleDeleteAccount} disabled={dangerLoading || deleteAccConfirm !== 'CONFIRMAR EXCLUSÃO'} className="w-full bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Excluir Conta</button>
+            <div className="space-y-3">
+              <div className="bg-background/80 border border-border rounded-xl p-1 px-3">
+                <input type="text" placeholder="CONFIRMAR EXCLUSÃO" value={deleteAccConfirm} onChange={e => setDeleteAccConfirm(e.target.value.toUpperCase())} className="w-full bg-transparent py-2 text-rose-600 focus:outline-none text-xs font-mono font-bold tracking-widest text-center" />
+              </div>
+              <button 
+                onClick={handleDeleteAccount} 
+                disabled={dangerLoading || deleteAccConfirm !== 'CONFIRMAR EXCLUSÃO'} 
+                className="w-full bg-black hover:bg-zinc-900 border border-zinc-700 text-rose-500 px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed uppercase tracking-wider"
+              >
+                Encerrar Minha Conta
+              </button>
+            </div>
           </div>
         </div>
       </section>

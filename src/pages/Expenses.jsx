@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark } from 'lucide-react';
 import { cn } from '../lib/utils';
+import UserAvatar from '../components/common/UserAvatar';
 
 export default function Expenses() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [dangerLoading, setDangerLoading] = useState(false);
@@ -43,9 +44,10 @@ export default function Expenses() {
   useEffect(() => { fetchExpenses(); }, [user, currentMonth]);
 
   const fetchCoreData = async () => {
-    const { data: catData } = await supabase.from('categories').select('*').or(`user_id.eq.${user.id},user_id.is.null`).order('name');
+    if (!activeGroupId) return;
+    const { data: catData } = await supabase.from('categories').select('*').or(`grupo_id.eq.${activeGroupId},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
-    const { data: cardData } = await supabase.from('cards').select('*').order('name');
+    const { data: cardData } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
     if (cardData) setCards(cardData);
   };
 
@@ -59,7 +61,8 @@ export default function Expenses() {
       const endDay = `${year}-${monthStr}-${lastDayNum}T23:59:59`;
 
       const { data, error } = await supabase.from('expenses')
-        .select(`*, categories(name, color), cards(*)`)
+        .select(`*, categories(name, color), cards(*), profiles(full_name, avatar_url, email)`)
+        .eq('grupo_id', activeGroupId)
         .gte('expense_date', startDay)
         .lte('expense_date', endDay)
         .order('expense_date', { ascending: false });
@@ -70,6 +73,7 @@ export default function Expenses() {
       // ── GLOBAL UNPAID EXPENSES (Absolute Limit) ──
       const { data: globalData } = await supabase.from('expenses')
         .select('*')
+        .eq('grupo_id', activeGroupId)
         .not('card_id', 'is', null)
         .eq('status', 'pending');
       setUnpaidExpensesGlobal(globalData || []);
@@ -91,6 +95,7 @@ export default function Expenses() {
 
       const payloadBase = {
         user_id: user.id,
+        grupo_id: activeGroupId,
         category_id: categoryId,
         card_id: (cardId === 'debit' || isLoan) ? null : cardId,
         is_recurring: isRecurring,
@@ -310,10 +315,13 @@ export default function Expenses() {
                           {exp.expense_type === 'loan' && <span className="text-[10px] bg-purple-500/10 text-purple-500 border border-purple-500/30 px-1.5 py-0.5 rounded uppercase font-bold flex items-center gap-1"><Landmark size={10} /> Empréstimo</span>}
                         </div>
                         <p className={cn("font-medium text-sm md:text-base text-content truncate", isPaid && "line-through text-muted")}>{exp.description}</p>
-                        <p className="text-xs text-muted mt-0.5 flex items-center gap-2">
-                          {new Date(exp.expense_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                          {exp.categories && <><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: exp.categories.color }}></span> {exp.categories.name}</>}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <UserAvatar nameOrEmail={exp.profiles?.full_name || exp.profiles?.email} size="sm" />
+                          <p className="text-[10px] md:text-xs text-muted flex items-center gap-2">
+                            {new Date(exp.expense_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                            {exp.categories && <><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: exp.categories.color }}></span> {exp.categories.name}</>}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -498,3 +506,5 @@ const ExpenseForm = ({
     </form>
   </div>
 );
+
+// UserAvatarBadge removido em favor do componente centralizado UserAvatar

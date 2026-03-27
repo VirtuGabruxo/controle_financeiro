@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, Plus, Loader2, Trash2, X, Edit2 } from 'lucide-react';
 
 export default function Cards() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [cards, setCards] = useState([]);
   
@@ -14,18 +14,21 @@ export default function Cards() {
   const [cardForm, setCardForm] = useState({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
 
   useEffect(() => {
-    fetchCardsData();
-  }, [user]);
+    if (activeGroupId) {
+      fetchCardsData();
+    }
+  }, [user, activeGroupId]);
 
   const fetchCardsData = async () => {
     setLoading(true);
     try {
-      const { data: cardsData, error: errC } = await supabase.from('cards').select('*').order('name');
+      const { data: cardsData, error: errC } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
       if (errC) throw errC;
 
       const { data: pendingExp, error: errE } = await supabase
         .from('expenses')
         .select('card_id, amount')
+        .eq('grupo_id', activeGroupId)
         .eq('status', 'pending')
         .not('card_id', 'is', null);
       if (errE) throw errE;
@@ -39,6 +42,7 @@ export default function Cards() {
       const { data: monthExp } = await supabase
         .from('expenses')
         .select('card_id, amount')
+        .eq('grupo_id', activeGroupId)
         .gte('expense_date', startDay)
         .lte('expense_date', endDay)
         .not('card_id', 'is', null);
@@ -77,7 +81,7 @@ export default function Cards() {
         const { error } = await supabase.from('cards').update(payload).eq('id', editingCardId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('cards').insert([{ user_id: user.id, ...payload }]);
+        const { error } = await supabase.from('cards').insert([{ user_id: user.id, grupo_id: activeGroupId, ...payload }]);
         if (error) throw error;
       }
 

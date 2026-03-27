@@ -5,7 +5,7 @@ import { Plus, DollarSign, Loader2, Trash2, Edit2, Calendar } from 'lucide-react
 import { cn } from '../lib/utils';
 
 export default function Incomes() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
   const [incomes, setIncomes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,8 +25,10 @@ export default function Incomes() {
   const [discounts, setDiscounts] = useState('');
 
   useEffect(() => {
-    fetchIncomes();
-  }, [user]);
+    if (activeGroupId) {
+      fetchIncomes();
+    }
+  }, [user, activeGroupId]);
 
   const fetchIncomes = async () => {
     try {
@@ -34,6 +36,7 @@ export default function Incomes() {
       const { data, error } = await supabase
         .from('incomes')
         .select('*')
+        .eq('grupo_id', activeGroupId)
         .order('month', { ascending: false });
         
       if (error) throw error;
@@ -52,6 +55,7 @@ export default function Incomes() {
     try {
       const payload = {
         user_id: user.id,
+        grupo_id: activeGroupId,
         month: month,
         description: description,
         type: type,

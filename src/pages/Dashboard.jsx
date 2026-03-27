@@ -5,12 +5,13 @@ import { Wallet, TrendingUp, TrendingDown, RefreshCcw, ChevronLeft, ChevronRight
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as PieTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as BarTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import UserAvatar from '../components/common/UserAvatar';
 
 const fmtBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 const fmtBRLShort = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
 export default function Dashboard() {
-  const { user, profile, showBalances } = useAuth();
+  const { user, profile, showBalances, activeGroupId } = useAuth();
   const [loading, setLoading] = useState(true);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -19,14 +20,18 @@ export default function Dashboard() {
   const [expensesByCategory, setExpensesByCategory] = useState([]);
   const [evolutionData, setEvolutionData] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   
   useEffect(() => {
-    fetchDashboardData();
-    fetchNotifications();
-  }, [user, currentMonth, profile]);
+    if (activeGroupId) {
+      fetchDashboardData();
+      fetchNotifications();
+      fetchRecentTransactions();
+    }
+  }, [user, currentMonth, profile, activeGroupId]);
 
   const fetchNotifications = async () => {
-    if (!profile?.notificar_vencimentos) {
+    if (!profile?.notificar_vencimentos || !activeGroupId) {
       setNotifications([]);
       return;
     }
@@ -36,20 +41,19 @@ export default function Dashboard() {
     
     // We look up to X days ahead
     const maxDate = new Date();
-    maxDate.setDate(today.getDate() + profile.dias_antecedencia);
+    maxDate.setDate(today.getDate() + (profile.dias_antecedencia || 7));
     const maxDateStr = `${maxDate.getFullYear()}-${String(maxDate.getMonth()+1).padStart(2,'0')}-${String(maxDate.getDate()).padStart(2,'0')}T23:59:59`;
 
     const { data: pendingExpenses } = await supabase
       .from('expenses')
       .select('id, description, amount, expense_date, expense_type, cards(name)')
-      .eq('user_id', user.id)
+      .eq('grupo_id', activeGroupId)
       .eq('status', 'pending')
       .lte('expense_date', maxDateStr)
       .order('expense_date', { ascending: true });
 
     if (pendingExpenses) {
       const alerts = pendingExpenses.map(exp => {
-         // Create Date based on expense_date (UTC ISO) and zero timezone to match local today
          const expDate = new Date(exp.expense_date + "T00:00:00");
          const diffTime = expDate - today;
          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -72,6 +76,7 @@ export default function Dashboard() {
   };
 
   const fetchDashboardData = async () => {
+    if (!activeGroupId) return;
     setLoading(true);
     try {
       const year = currentMonth.getFullYear();
@@ -81,14 +86,13 @@ export default function Dashboard() {
       
       const firstDay = `${year}-${monthStr}-01T00:00:00`;
       const lastDay = `${year}-${monthStr}-${lastDayNum}T23:59:59`;
-      
       const incomeMonthStr = `${year}-${monthStr}-01`;
 
-      const { data: incomes } = await supabase.from('incomes').select('net_amount, gross_amount, discounts').eq('month', incomeMonthStr).eq('user_id', user.id);
+      const { data: incomes } = await supabase.from('incomes').select('net_amount, gross_amount, discounts').eq('month', incomeMonthStr).eq('grupo_id', activeGroupId);
       const sumIncome = incomes?.reduce((acc, curr) => acc + (curr.net_amount !== undefined ? Number(curr.net_amount) : Number(curr.gross_amount) - Number(curr.discounts || 0)), 0) || 0;
       setTotalIncome(sumIncome);
 
-      const { data: expenses } = await supabase.from('expenses').select('amount, categories(name, color)').gte('expense_date', firstDay).lte('expense_date', lastDay).eq('user_id', user.id);
+      const { data: expenses } = await supabase.from('expenses').select('amount, categories(name, color)').gte('expense_date', firstDay).lte('expense_date', lastDay).eq('grupo_id', activeGroupId);
       const sumExpense = expenses?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
       setTotalExpense(sumExpense);
 
@@ -105,8 +109,7 @@ export default function Dashboard() {
 
       const d6 = new Date(year, month - 5, 1);
       const sixMonthsAgo = `${d6.getFullYear()}-${String(d6.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
-      
-      const { data: evolExpenses } = await supabase.from('expenses').select('amount, expense_date').gte('expense_date', sixMonthsAgo).lte('expense_date', lastDay).eq('user_id', user.id);
+      const { data: evolExpenses } = await supabase.from('expenses').select('amount, expense_date').gte('expense_date', sixMonthsAgo).lte('expense_date', lastDay).eq('grupo_id', activeGroupId);
         
       if (evolExpenses) {
         const monthlyTotals = {};
@@ -127,6 +130,12 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRecentTransactions = async () => {
+    if (!activeGroupId) return;
+    const { data: exps } = await supabase.from('expenses').select('id, description, amount, expense_date, type:expense_type, profiles(full_name, avatar_url, email)').eq('grupo_id', activeGroupId).order('expense_date', { ascending: false }).limit(5);
+    setRecentTransactions(exps || []);
   };
 
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -248,34 +257,62 @@ export default function Dashboard() {
            ) : <div className="h-48 md:h-64 flex items-center justify-center text-muted border border-dashed border-border/50 rounded-xl text-sm">Sem despesas neste mês.</div>}
          </div>
          
-         {/* Intelligent Insights */}
-         <div className="bg-surface/40 border border-border rounded-2xl p-5 md:p-6 w-full">
-            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Insights do Mês</h3>
-            <div className="space-y-3 md:space-y-4">
-               {totalExpense > totalIncome && totalIncome > 0 && (
-                 <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <p className="text-red-400 font-medium text-sm md:text-base flex items-center gap-2">⚠️ Atenção ao seu orçamento!</p>
-                    <p className="text-xs md:text-sm text-red-400/80 mt-1">Suas despesas superaram suas rendas neste mês. Considere rever seus gastos com {expensesByCategory[0]?.name}.</p>
-                 </div>
-               )}
-               {expensesByCategory.length > 0 && (
-                 <div className="p-3 md:p-4 bg-background/50 border border-border rounded-xl">
-                    <p className="text-muted font-medium text-sm md:text-base">💡 Maior Gasto</p>
-                    <p className="text-xs md:text-sm text-muted mt-1">A categoria <span className="text-content font-bold">{expensesByCategory[0]?.name}</span> representa <span className="text-rose-400 font-bold">{((expensesByCategory[0]?.value / totalExpense) * 100).toFixed(1)}%</span> das suas despesas.</p>
-                 </div>
-               )}
-               {balance > 0 && (
-                 <div className="p-3 md:p-4 bg-primary/10 border border-primary/20 rounded-xl">
-                    <p className="text-primary-glow font-medium text-sm md:text-base">🎉 Parabéns!</p>
-                    <p className="text-xs md:text-sm text-primary-glow/80 mt-1">Seu balanço está positivo. Excelente gestão financeira neste mês!</p>
-                 </div>
-               )}
-               {totalExpense === 0 && totalIncome === 0 && (
-                 <div className="p-4 text-center text-muted text-sm md:text-base">Nenhuma movimentação registrada.<br className="hidden md:block" />Comece adicionando rendas ou despesas.</div>
-               )}
+          {/* Recent Transactions List with Identity */}
+          <div className="bg-surface/40 border border-border rounded-2xl p-5 md:p-6 w-full">
+            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Últimas Transações</h3>
+            <div className="space-y-4">
+              {recentTransactions.length > 0 ? (
+                recentTransactions.map(tx => (
+                  <div key={tx.id} className="flex items-center justify-between gap-4 p-2 rounded-xl hover:bg-background/40 transition-colors">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <UserAvatar nameOrEmail={tx.profiles?.full_name || tx.profiles?.email} size="sm" />
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-medium text-content truncate leading-tight">{tx.description}</p>
+                        <p className="text-[10px] text-muted mt-0.5">{new Date(tx.expense_date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-rose-400 whitespace-nowrap">
+                      -{fmtBRL(tx.amount)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-center text-muted py-4">Nenhuma transação recente no grupo.</p>
+              )}
             </div>
-         </div>
-      </div>
+            <Link to="/expenses" className="block text-center text-xs text-primary-glow font-bold mt-6 hover:underline">Ver todas</Link>
+          </div>
+          
+          {/* Intelligent Insights */}
+          <div className="bg-surface/40 border border-border rounded-2xl p-5 md:p-6 w-full">
+             <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Insights do Mês</h3>
+             <div className="space-y-3 md:space-y-4">
+                {totalExpense > totalIncome && totalIncome > 0 && (
+                  <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                     <p className="text-red-400 font-medium text-sm md:text-base flex items-center gap-2">⚠️ Atenção ao seu orçamento!</p>
+                     <p className="text-xs md:text-sm text-red-400/80 mt-1">Suas despesas superaram suas rendas neste mês. Considere rever seus gastos com {expensesByCategory[0]?.name}.</p>
+                  </div>
+                )}
+                {expensesByCategory.length > 0 && (
+                  <div className="p-3 md:p-4 bg-background/50 border border-border rounded-xl">
+                     <p className="text-muted font-medium text-sm md:text-base">💡 Maior Gasto</p>
+                     <p className="text-xs md:text-sm text-muted mt-1">A categoria <span className="text-content font-bold">{expensesByCategory[0]?.name}</span> representa <span className="text-rose-400 font-bold">{((expensesByCategory[0]?.value / totalExpense) * 100).toFixed(1)}%</span> das suas despesas.</p>
+                  </div>
+                )}
+                {balance > 0 && (
+                  <div className="p-3 md:p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                     <p className="text-primary-glow font-medium text-sm md:text-base">🎉 Parabéns!</p>
+                     <p className="text-xs md:text-sm text-primary-glow/80 mt-1">Seu balanço está positivo. Excelente gestão financeira neste mês!</p>
+                  </div>
+                )}
+                {totalExpense === 0 && totalIncome === 0 && (
+                  <div className="p-4 text-center text-muted text-sm md:text-base">Nenhuma movimentação registrada.<br className="hidden md:block" />Comece adicionando rendas ou despesas.</div>
+                )}
+             </div>
+          </div>
+       </div>
     </div>
   );
 }
+
+// UserAvatarBadge removido em favor do componente centralizado UserAvatar

@@ -2,6 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, DollarSign, CreditCard, LogOut, Settings as SettingsIcon, Eye, EyeOff, Target, PieChart, LineChart, FileDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import GroupSelector from './GroupSelector';
+import UserAvatar from '../common/UserAvatar';
 
 export default function Sidebar() {
   const location = useLocation();
@@ -20,11 +22,13 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-surface border-r border-border flex-shrink-0 relative">
-      <div className="p-6">
+      <div className="p-6 pb-2">
         <h1 className="text-xl font-bold bg-gradient-to-r from-primary-glow to-cyan-400 bg-clip-text text-transparent">
           FinControl
         </h1>
       </div>
+
+      <GroupSelector />
       
       <nav className="flex-1 px-4 space-y-2 mt-4">
         {navItems.map((item) => {
@@ -70,9 +74,7 @@ export default function Sidebar() {
           {profile?.avatar_url ? (
             <img src={profile.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full object-cover border-2 shadow-sm" style={{ borderColor: 'var(--primary)' }} />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-surface border-2 flex items-center justify-center font-bold shadow-sm text-content" style={{ borderColor: 'var(--primary)' }}>
-              {profile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
+            <UserAvatar nameOrEmail={profile?.full_name || user?.email} size="md" className="border-2" style={{ borderColor: 'var(--primary)' }} />
           )}
           <div className="flex flex-col flex-1 overflow-hidden">
             <span className="text-sm font-semibold text-content block truncate leading-tight">{profile?.full_name || 'Minha Conta'}</span>

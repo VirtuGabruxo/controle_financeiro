@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Target, Plus, Loader2, Trash2, TrendingUp, X, Check, Edit2 } from 'lucide-react';
 
 export default function Goals() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [goals, setGoals] = useState([]);
 
@@ -20,13 +20,15 @@ export default function Goals() {
   const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
 
   useEffect(() => {
-    fetchGoals();
-  }, [user]);
+    if (activeGroupId) {
+       fetchGoals();
+    }
+  }, [user, activeGroupId]);
 
   const fetchGoals = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('goals').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('goals').select('*').eq('grupo_id', activeGroupId).order('created_at', { ascending: false });
       if (error) throw error;
       setGoals(data || []);
     } catch (e) {
@@ -49,7 +51,7 @@ export default function Goals() {
       if (editingGoalId) {
         await supabase.from('goals').update(payload).eq('id', editingGoalId);
       } else {
-        await supabase.from('goals').insert([{ user_id: user.id, current_amount: 0, ...payload }]);
+        await supabase.from('goals').insert([{ user_id: user.id, grupo_id: activeGroupId, current_amount: 0, ...payload }]);
       }
       
       closeGoalModal();
@@ -88,6 +90,7 @@ export default function Goals() {
         d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
         await supabase.from('expenses').insert([{
            user_id: user.id,
+           grupo_id: activeGroupId,
            description: `Depósito: Caixinha ${selectedGoal.name}`,
            amount: amt,
            expense_date: d.toISOString().split('T')[0],

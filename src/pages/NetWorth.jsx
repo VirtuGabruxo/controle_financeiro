@@ -5,22 +5,24 @@ import { LineChart as LineIcon, Loader2, Wallet, TrendingUp } from 'lucide-react
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 export default function NetWorth() {
-  const { user, showBalances } = useAuth();
+  const { user, showBalances, activeGroupId } = useAuth();
   const [loading, setLoading] = useState(true);
   
   const [accumulatedData, setAccumulatedData] = useState([]);
   const [currentNetWorth, setCurrentNetWorth] = useState(0);
 
   useEffect(() => {
-    fetchHistory();
-  }, [user]);
+    if (activeGroupId) {
+      fetchHistory();
+    }
+  }, [user, activeGroupId]);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      // Fetch absolutely all incomes and expenses unconditionally
-      const { data: incomes } = await supabase.from('incomes').select('net_amount, month').order('month', { ascending: true });
-      const { data: expenses } = await supabase.from('expenses').select('amount, expense_date').order('expense_date', { ascending: true });
+      // Fetch data for the active group
+      const { data: incomes } = await supabase.from('incomes').select('net_amount, month').eq('grupo_id', activeGroupId).order('month', { ascending: true });
+      const { data: expenses } = await supabase.from('expenses').select('amount, expense_date').eq('grupo_id', activeGroupId).order('expense_date', { ascending: true });
       
       const timeline = {};
       
