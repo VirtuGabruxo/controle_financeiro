@@ -8,6 +8,8 @@ export default function Expenses() {
   const { user, showBalances } = useAuth();
   
   const [loading, setLoading] = useState(true);
+  const [dangerLoading, setDangerLoading] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cards, setCards] = useState([]);
@@ -126,6 +128,7 @@ export default function Expenses() {
       
       handleCancelEdit();
       fetchExpenses();
+      setShowExpenseModal(false);
     } catch (error) {
       alert('Erro ao salvar despesa: ' + error.message);
     } finally {
@@ -164,6 +167,7 @@ export default function Expenses() {
     setCardId(exp.card_id || 'debit');
     setExpenseType(exp.expense_type || (exp.is_recurring ? 'fixed' : 'common'));
     setInstallments('1');
+    setShowExpenseModal(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -173,6 +177,7 @@ export default function Expenses() {
     setAmount('');
     setInstallments('1');
     setExpenseType('common');
+    setShowExpenseModal(false);
   };
 
   const handleDelete = async (id) => {
@@ -197,6 +202,87 @@ export default function Expenses() {
   });
   const debitTotal = expenses.filter(e => !e.card_id).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
+  const ExpenseForm = ({ embedded = true }) => (
+    <div className={cn(
+      "bg-surface border border-border rounded-2xl p-5 md:p-6 h-fit",
+      embedded ? "relative lg:sticky lg:top-6" : ""
+    )}>
+      <div className="flex justify-between items-center mb-6">
+         <h2 className="text-lg md:text-xl font-semibold text-content flex items-center gap-2">
+           <Plus className="text-rose-400" /> {editingId ? 'Editar Despesa' : 'Novo Gasto'}
+         </h2>
+         <button type="button" onClick={handleCancelEdit} className="text-xs text-muted hover:text-content">
+           {embedded && !editingId ? null : (embedded ? 'Cancelar' : <X size={20} />)}
+         </button>
+      </div>
+      
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2 mb-4">
+           <label className="text-xs font-semibold text-muted tracking-wide uppercase">TIPO DE LANÇAMENTO</label>
+           <div className="grid grid-cols-3 gap-2">
+             <button type="button" disabled={editingId} onClick={() => setExpenseType('common')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'common' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                <FileText size={16} className="mb-1" /> Compra Comum
+             </button>
+             <button type="button" disabled={editingId} onClick={() => setExpenseType('fixed')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'fixed' ? "bg-blue-500/10 border-blue-500/50 text-blue-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                <Repeat size={16} className="mb-1" /> Assinatura Fixa
+             </button>
+             <button type="button" disabled={editingId} onClick={() => setExpenseType('loan')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'loan' ? "bg-purple-500/10 border-purple-500/50 text-purple-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
+                <Landmark size={16} className="mb-1" /> Empréstimo
+             </button>
+           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-muted">Descrição</label>
+          <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder={expenseType==='loan' ? "Ex: Financiamento Carro" : "Ex: Mercado"} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted">{expenseType==='loan'?'Valor da Parcela':'Valor'}</label>
+            <div className="relative flex items-center bg-background/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-rose-500/50">
+              <span className="pl-3 text-muted text-sm">R$</span>
+              <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-transparent px-2 py-2.5 text-content focus:outline-none text-sm md:text-base" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted">{expenseType==='fixed'?'Dia do Vencimento':'Data'}</label>
+            <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+           <div className="flex justify-between items-center">
+             <label className="text-sm font-medium text-muted flex items-center gap-2">Forma de Pag. {expenseType === 'loan' && <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1 rounded">(Forçado à Débito/Pix)</span>}</label>
+             {expenseType !== 'loan' && <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-primary-glow hover:text-content flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>}
+           </div>
+           <select disabled={expenseType === 'loan'} value={expenseType === 'loan' ? 'debit' : cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none disabled:opacity-60">
+             <option value="debit">Débito / Dinheiro / Pix</option>
+             {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}</option>)}
+           </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+           <div className="space-y-1.5">
+             <label className="text-sm font-medium text-muted">Categoria</label>
+             <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
+               <option value="">Selecione...</option>
+               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+             </select>
+           </div>
+           <div className="space-y-1.5">
+             <label className="text-sm font-medium text-muted">Nº Parcelas</label>
+             <input type="number" min="1" max="120" disabled={editingId || expenseType === 'fixed'} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
+           </div>
+        </div>
+
+        <button type="submit" disabled={isSubmitting} className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 text-sm md:text-base">
+           {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : ( <>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Lançamento'}</> )}
+        </button>
+      </form>
+    </div>
+  );
+
   return (
     <div className="space-y-6 md:space-y-8 max-w-7xl mx-auto w-full pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -206,7 +292,7 @@ export default function Expenses() {
         </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
+      <div className="flex gap-4 overflow-x-auto pb-4 snap-x scrollbar-none touch-pan-x">
          <div className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
             <div className="flex justify-between items-center mb-2">
               <span className="text-muted text-sm flex items-center gap-2"><Wallet size={16}/> Débito / Pix</span>
@@ -237,86 +323,15 @@ export default function Expenses() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
-        {/* Formulário Desktop Sidebar */}
-        <div className="lg:col-span-1 bg-surface border border-border rounded-2xl p-5 md:p-6 relative lg:sticky lg:top-6 z-10 h-fit">
-          <div className="flex justify-between items-center mb-6">
-             <h2 className="text-lg md:text-xl font-semibold text-content flex items-center gap-2">
-               <Plus className="text-rose-400" /> {editingId ? 'Editar Despesa' : 'Novo Gasto'}
-             </h2>
-             {editingId && <button type="button" onClick={handleCancelEdit} className="text-xs text-muted hover:text-content">Cancelar</button>}
-          </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            <div className="space-y-2 mb-4">
-               <label className="text-xs font-semibold text-muted tracking-wide uppercase">TIPO DE LANÇAMENTO</label>
-               <div className="grid grid-cols-3 gap-2">
-                 <button type="button" disabled={editingId} onClick={() => setExpenseType('common')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'common' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
-                    <FileText size={16} className="mb-1" /> Compra Comum
-                 </button>
-                 <button type="button" disabled={editingId} onClick={() => setExpenseType('fixed')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'fixed' ? "bg-blue-500/10 border-blue-500/50 text-blue-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
-                    <Repeat size={16} className="mb-1" /> Assinatura Fixa
-                 </button>
-                 <button type="button" disabled={editingId} onClick={() => setExpenseType('loan')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'loan' ? "bg-purple-500/10 border-purple-500/50 text-purple-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
-                    <Landmark size={16} className="mb-1" /> Empréstimo
-                 </button>
-               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted">Descrição</label>
-              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder={expenseType==='loan' ? "Ex: Financiamento Carro" : "Ex: Mercado"} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm md:text-base" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">{expenseType==='loan'?'Valor da Parcela':'Valor'}</label>
-                <div className="relative flex items-center bg-background/50 border border-border rounded-xl focus-within:ring-2 focus-within:ring-rose-500/50">
-                  <span className="pl-3 text-muted text-sm">R$</span>
-                  <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} required className="w-full bg-transparent px-2 py-2.5 text-content focus:outline-none text-sm md:text-base" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-muted">{expenseType==='fixed'?'Dia do Vencimento':'Data'}</label>
-                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-               <div className="flex justify-between items-center">
-                 <label className="text-sm font-medium text-muted flex items-center gap-2">Forma de Pag. {expenseType === 'loan' && <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1 rounded">(Forçado à Débito/Pix)</span>}</label>
-                 {expenseType !== 'loan' && <button type="button" onClick={() => setShowCardModal(true)} className="text-[10px] text-primary-glow hover:text-content flex items-center gap-1"><Settings2 size={12}/> Gerenciar</button>}
-               </div>
-               <select disabled={expenseType === 'loan'} value={expenseType === 'loan' ? 'debit' : cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none disabled:opacity-60">
-                 <option value="debit">Débito / Dinheiro / Pix</option>
-                 {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}</option>)}
-               </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-1.5">
-                 <label className="text-sm font-medium text-muted">Categoria</label>
-                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none">
-                   <option value="">Selecione...</option>
-                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                 </select>
-               </div>
-               <div className="space-y-1.5">
-                 <label className="text-sm font-medium text-muted">Nº Parcelas</label>
-                 <input type="number" min="1" max="120" disabled={editingId || expenseType === 'fixed'} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
-               </div>
-            </div>
-
-            <button type="submit" disabled={isSubmitting} className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 text-sm md:text-base">
-               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : ( <>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Lançamento'}</> )}
-            </button>
-          </form>
+        {/* Formulário Desktop Sidebar (Visible only on LG+) */}
+        <div className="hidden lg:block lg:col-span-1">
+          <ExpenseForm />
         </div>
 
         {/* Histórico/Lista */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
            <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
-             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x w-full md:w-auto">
+             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x w-full md:w-auto touch-pan-x">
                <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
                <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
                {cards.map(c => (
@@ -393,6 +408,26 @@ export default function Expenses() {
         </div>
       </div>
       
+      {/* ── MOBILE FAB ── */}
+      <button
+        onClick={() => { handleCancelEdit(); setShowExpenseModal(true); }}
+        className="fixed bottom-20 right-6 z-40 lg:hidden w-14 h-14 bg-rose-500 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-rose-400 transition-all active:scale-95 border-2 border-white/20"
+      >
+        <Plus size={28} strokeWidth={3} />
+      </button>
+
+      {/* ── MOBILE MODAL ── */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelEdit} />
+          <div className="relative w-full max-w-lg bg-surface rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="px-4 py-6">
+              <ExpenseForm embedded={false} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
