@@ -10,7 +10,7 @@ export const AVAILABLE_COLORS = [ { name: 'Cinza', hex: '#a1a1aa' }, { name: 'Ro
 const EMPTY_FORM = { id: null, name: '', icon: 'Tag', color: '#a1a1aa' };
 
 export default function Settings() {
-  const { user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor } = useAuth();
+  const { user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor, setProfile: setGlobalProfile, setShowBalances } = useAuth();
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
@@ -57,7 +57,11 @@ export default function Settings() {
     setProfileMessage('');
     const { error } = await supabase.from('profiles').upsert({ id: user.id, ...profile });
     if (error) setProfileMessage('Erro ao salvar: ' + error.message);
-    else { setProfileMessage('Configurações salvas!'); setTimeout(() => setProfileMessage(''), 3000); }
+    else {
+      setGlobalProfile(profile); // ← Sync global context for reactive updates
+      setProfileMessage('Configurações salvas!'); 
+      setTimeout(() => setProfileMessage(''), 3000);
+    }
     setSavingProfile(false);
   };
 
@@ -169,7 +173,7 @@ export default function Settings() {
             <h3 className="font-medium text-content mb-1">Modo Privacidade Global</h3>
             <p className="text-sm text-muted mb-4">Oculte os saldos com "R$ ****" por padrão ao abrir o aplicativo em locais públicos.</p>
             <label className="relative inline-flex items-center cursor-pointer w-fit">
-              <input type="checkbox" name="ocultar_saldos" checked={profile.ocultar_saldos} onChange={async (e) => { handleProfileChange(e); await supabase.from('profiles').upsert({ id: user.id, ocultar_saldos: e.target.checked }); }} className="sr-only peer" />
+              <input type="checkbox" name="ocultar_saldos" checked={profile.ocultar_saldos} onChange={async (e) => { handleProfileChange(e); setShowBalances(!e.target.checked); await supabase.from('profiles').upsert({ id: user.id, ocultar_saldos: e.target.checked }); setGlobalProfile(prev => ({...prev, ocultar_saldos: e.target.checked})); }} className="sr-only peer" />
               <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
