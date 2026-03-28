@@ -28,7 +28,13 @@ export default function GroupSelector() {
         className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all group"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+            style={{ 
+              backgroundColor: `${activeGroup?.cor || '#10b981'}20`, 
+              color: activeGroup?.cor || '#10b981' 
+            }}
+          >
             {activeGroup?.nome?.toLowerCase().includes('pessoal') ? (
               <User size={20} />
             ) : (
@@ -37,7 +43,12 @@ export default function GroupSelector() {
           </div>
           <div className="text-left overflow-hidden">
             <p className="text-xs text-muted font-medium truncate uppercase tracking-wider">Espaço Ativo</p>
-            <p className="text-sm font-semibold text-content truncate">{activeGroup?.nome || 'Selecionar...'}</p>
+            <p 
+              className="text-sm font-semibold truncate"
+              style={{ color: activeGroup?.cor || '#10b981' }}
+            >
+              {activeGroup?.nome || 'Selecionar...'}
+            </p>
           </div>
         </div>
         <ChevronDown 
@@ -64,9 +75,13 @@ export default function GroupSelector() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
-                    activeGroupId === group.id ? 'bg-primary text-white' : 'bg-zinc-100 dark:bg-zinc-700 text-muted'
-                  }`}>
+                  <div 
+                    className="w-8 h-8 rounded-md flex items-center justify-center transition-colors"
+                    style={{ 
+                      backgroundColor: `${group.cor || '#10b981'}20`, 
+                      color: group.cor || '#10b981' 
+                    }}
+                  >
                     {group.nome?.toLowerCase().includes('pessoal') ? (
                       <User size={16} />
                     ) : (
@@ -74,14 +89,17 @@ export default function GroupSelector() {
                     )}
                   </div>
                   <div className="text-left">
-                    <p className={`text-sm font-medium ${activeGroupId === group.id ? 'text-primary' : 'text-content'}`}>
+                    <p 
+                      className="text-sm font-medium"
+                      style={{ color: activeGroupId === group.id ? (group.cor || '#10b981') : undefined }}
+                    >
                       {group.nome}
                     </p>
                     <p className="text-[10px] text-muted capitalize">{group.papel}</p>
                   </div>
                 </div>
                 {activeGroupId === group.id && (
-                  <Check size={16} className="text-primary" />
+                  <Check size={16} style={{ color: group.cor || '#10b981' }} />
                 )}
               </button>
             ))}

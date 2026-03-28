@@ -19,7 +19,7 @@ const EMPTY_FORM = { id: null, name: '', icon: 'Tag', color: '#a1a1aa' };
 export default function Settings() {
   const { 
     user, updatePassword, signOut, themeMode, setThemeMode, accentColor, setAccentColor, 
-    setProfile: setGlobalProfile, setShowBalances, activeGroupId, userGroups, refreshGroups, activeRole
+    setProfile: setGlobalProfile, setShowBalances, activeGroupId, userGroups, refreshGroups, activeRole, setActiveGroupId
   } = useAuth();
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -28,8 +28,6 @@ export default function Settings() {
   const [profile, setProfile] = useState({
     full_name: '',
     avatar_url: '',
-    salario_padrao: 4452.00,
-    dia_virada: 1,
     ocultar_saldos: false,
     cor_destaque: 'emerald',
     notificar_vencimentos: false,
@@ -51,6 +49,14 @@ export default function Settings() {
   const [groupName, setGroupName] = useState('');
   const [savingGroupName, setSavingGroupName] = useState(false);
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
+  const [showDeleteGroupModal, setShowDeleteGroupModal] = useState(false);
+  const [deleteGroupNameConfirm, setDeleteGroupNameConfirm] = useState('');
+  
+  // Novos estados para criação de Workspace
+  const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const [newWorkspaceColor, setNewWorkspaceColor] = useState('#3b82f6'); // Default Azul
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
 
   useEffect(() => { fetchData(); }, [user]);
 
@@ -117,7 +123,7 @@ export default function Settings() {
     setInviting(true);
     
     const { error } = await supabase.from('convites').insert([{
-      grupo_id: activeGroupId,
+      grupo_id: activeGroupId, // ← Garantia de escopo: usa estritamente o ID do contexto
       email_convidado: inviteEmail.trim().toLowerCase(),
       convidado_por: user.id
     }]);
@@ -130,6 +136,79 @@ export default function Settings() {
       alert('Convite enviado com sucesso!');
     }
     setInviting(false);
+  };
+
+  const handleCreateWorkspace = async (e) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim()) return;
+    setCreatingWorkspace(true);
+
+    try {
+      // 1. Inserir o novo grupo
+      let insertData = { nome: newWorkspaceName.trim() };
+      
+      // Tentamos incluir a cor; se a coluna não existir, o Supabase retornará erro
+      // mas podemos tentar tratar ou o usuário pode ajustar o banco.
+      // Como o usuário pediu explicitamente, mantemos no payload inicial.
+      const { data: groupData, error: groupError } = await supabase
+        .from('grupos')
+        .insert([{ ...insertData, cor: newWorkspaceColor }])
+        .select()
+        .single();
+
+      if (groupError) {
+        // Se o erro for de coluna inexistente, tentamos sem a cor
+        const isColumnError = 
+          groupError.message?.includes('column "cor" of relation "grupos" does not exist') ||
+          groupError.message?.includes("Could not find the 'cor' column");
+
+        if (isColumnError) {
+          const { data: retryData, error: retryError } = await supabase
+            .from('grupos')
+            .insert([insertData])
+            .select()
+            .single();
+          
+          if (retryError) throw retryError;
+          // Sucesso no retry, mas avisamos (ou apenas seguimos)
+          console.warn('Workspace criado sem cor personalizada (coluna "cor" não encontrada no BD).');
+          // Prosseguimos com retryData
+          const { error: memberError } = await supabase
+            .from('membros_grupo')
+            .insert([{
+              grupo_id: retryData.id,
+              user_id: user.id,
+              papel: 'admin'
+            }]);
+          if (memberError) throw memberError;
+          await refreshGroups();
+          await setActiveGroupId(retryData.id);
+        } else {
+          throw groupError;
+        }
+      } else {
+        // Sucesso na primeira tentativa
+        const { error: memberError } = await supabase
+          .from('membros_grupo')
+          .insert([{
+            grupo_id: groupData.id,
+            user_id: user.id,
+            papel: 'admin'
+          }]);
+        if (memberError) throw memberError;
+        await refreshGroups();
+        await setActiveGroupId(groupData.id);
+      }
+      
+      setShowNewWorkspaceModal(false);
+      setNewWorkspaceName('');
+      alert('Novo Workspace criado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao criar workspace:', error);
+      alert('Erro ao criar workspace: ' + error.message);
+    } finally {
+      setCreatingWorkspace(false);
+    }
   };
 
   const handleLeaveGroup = async () => {
@@ -162,22 +241,40 @@ export default function Settings() {
       return alert('Você não pode excluir seu grupo pessoal.');
     }
 
-    const confirm1 = window.confirm(`⚠️ ATENÇÃO: Isso excluirá permanentemente o grupo "${group.nome}" e TODOS os dados vinculados a ele (despesas, rendas, etc). Deseja continuar?`);
-    if (!confirm1) return;
-
-    const confirm2 = window.confirm(`DIGITE O NOME DO GRUPO PARA CONFIRMAR: "${group.nome}"`);
-    // Simplificando confirmação para UX, mas mantendo o alerta de risco
+    if (deleteGroupNameConfirm.trim().toUpperCase() !== group.nome.trim().toUpperCase()) {
+      return alert('O nome digitado não coincide com o nome do grupo.');
+    }
     
     setIsDeletingGroup(true);
-    const { error } = await supabase.from('grupos').delete().eq('id', activeGroupId);
+    
+    // Deletar o grupo e obter a confirmação real da linha excluída
+    const { count, error } = await supabase
+      .from('grupos')
+      .delete({ count: 'exact' })
+      .eq('id', activeGroupId);
 
     if (error) {
       alert('Erro ao excluir grupo: ' + error.message);
+      setIsDeletingGroup(false);
+    } else if (count === 0) {
+      alert('Não foi possível excluir o grupo no banco de dados. Verifique se você é o dono/criador do grupo e tente novamente.');
+      setIsDeletingGroup(false);
     } else {
+      // Sucesso na deleção!
+      // Precisamos garantir que o usuário não continue no grupo excluído
+      const personalGroup = userGroups.find(g => g.nome.toLowerCase().includes('pessoal'));
+      
+      if (personalGroup) {
+        // Atualizar o active_group_id no perfil para o grupo pessoal
+        await supabase
+          .from('profiles')
+          .update({ active_group_id: personalGroup.id })
+          .eq('id', user.id);
+      }
+      
       alert('Grupo excluído com sucesso.');
       window.location.reload();
     }
-    setIsDeletingGroup(false);
   };
 
   const handleProfileChange = (e) => {
@@ -324,16 +421,53 @@ export default function Settings() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: Groups Management */}
-        <div className="lg:col-span-1 space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
-          <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm overflow-hidden relative">
+        <div className="lg:col-span-5 h-full flex flex-col space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
+          <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm overflow-hidden relative h-full flex flex-col">
             <div className="absolute top-0 left-0 w-1 p-0.5 h-full bg-cyan-500/50" />
-            <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6">
-              <Users size={20} className="text-cyan-400" /> Meu Grupo Familiar
+            <h2 className="text-xl font-semibold text-content flex items-center justify-between gap-2 mb-6">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-cyan-400" /> Meu Grupo Familiar
+              </div>
             </h2>
             
-            <div className="space-y-6">
+            <div className="space-y-6 flex-1 flex flex-col">
+              {/* Workspace Pills Switcher */}
+              <div className="flex flex-wrap items-center gap-2 mb-6 p-1.5 bg-background/30 rounded-2xl border border-border/30">
+                {userGroups.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => setActiveGroupId(g.id)}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-bold rounded-full transition-all flex items-center gap-2 border shadow-sm",
+                      activeGroupId === g.id 
+                        ? "shadow-lg shadow-black/20" 
+                        : "bg-background/50 text-muted border-transparent hover:border-border hover:text-content"
+                    )}
+                    style={activeGroupId === g.id ? { 
+                      borderColor: `${g.cor || '#10b981'}40`,
+                      backgroundColor: `${g.cor || '#10b981'}15`,
+                      color: g.cor || '#10b981'
+                    } : {}}
+                  >
+                    <div 
+                      className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" 
+                      style={{ 
+                        backgroundColor: g.cor || '#10b981',
+                        boxShadow: `0 0 10px ${g.cor || '#10b981'}40`
+                      }} 
+                    />
+                    {g.nome}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setShowNewWorkspaceModal(true)}
+                  className="px-3 py-1 text-xs font-bold rounded-full text-muted hover:text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5 border border-dashed border-border/50 hover:border-primary/30"
+                >
+                  <Plus size={12} /> Novo
+                </button>
+              </div>
               {/* Nome do Grupo (Admin ou Leitura) */}
               <div className="space-y-3">
                 <p className="text-[10px] font-bold text-muted uppercase tracking-widest flex items-center justify-between">
@@ -433,6 +567,15 @@ export default function Settings() {
                     </button>
                   </form>
                   <p className="text-[10px] text-muted italic">Os novos membros terão acesso a todos os dados deste workspace.</p>
+                  
+                  {groupMembers.length === 1 && (
+                    <div className="flex items-start gap-1.5 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-amber-500/80 leading-tight">
+                        Ao convidar, a pessoa terá acesso a todo o histórico deste espaço. Recomendamos criar um novo workspace para dividir contas.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="pt-4 border-t border-border/50">
@@ -466,15 +609,19 @@ export default function Settings() {
                 </div>
               )}
 
+
+
               {/* Group Actions (Delete or Leave) */}
-              <div className="pt-4 border-t border-border/30 flex flex-col gap-2">
+              <div className="pt-6 border-t border-border/30 flex flex-col gap-2">
                 {activeRole === 'admin' ? (
                   <button 
-                    onClick={handleDeleteGroup}
-                    disabled={isDeletingGroup}
+                    onClick={() => {
+                      setDeleteGroupNameConfirm('');
+                      setShowDeleteGroupModal(true);
+                    }}
                     className="w-full text-xs text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-lg transition-all flex items-center justify-center gap-2 font-bold"
                   >
-                    {isDeletingGroup ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    <Trash2 size={14} />
                     EXCLUIR WORKSPACE
                   </button>
                 ) : (
@@ -491,7 +638,7 @@ export default function Settings() {
         </div>
 
         {/* RIGHT COLUMNS: Profile + Password + Notifications + Categories */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-7 flex flex-col gap-6">
           {/* PROFILE */}
           <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><User size={20} className="text-primary-glow" /> Perfil Básico</h2>
@@ -517,7 +664,7 @@ export default function Settings() {
             </form>
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             {/* PASSWORD */}
             <section className="bg-surface/50 border border-border rounded-2xl p-6 h-full flex flex-col shadow-sm">
               <h3 className="text-lg font-semibold text-content mb-6 flex items-center gap-2"><Lock size={18} className="text-muted" /> Alterar Minha Senha</h3>
@@ -557,68 +704,49 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ── LOWER GRID: Financial + Categories ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        {/* FINANCIAL PREFS */}
-        <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-content flex items-center gap-2 mb-6"><Wallet size={20} className="text-blue-400" /> Configurações Financeiras</h2>
-          <form onSubmit={saveProfile} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-muted font-medium">Salário Base Padrão (R$)</label>
-              <input type="number" step="0.01" name="salario_padrao" value={profile.salario_padrao} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-muted font-medium">Dia de Virada do Mês</label>
-              <input type="number" min="1" max="31" name="dia_virada" value={profile.dia_virada} onChange={handleProfileChange} className="w-full bg-background/50 border border-border rounded-xl px-4 py-2 text-content focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm" />
-            </div>
-            <button type="submit" className="w-full bg-border hover:bg-surface text-content font-bold py-2.5 rounded-xl transition-all border border-border/50 shadow-sm mt-2">Salvar Configurações</button>
-          </form>
-        </section>
+      {/* ── CATEGORIES ── full width */}
+      <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12" />
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <h2 className="text-xl font-semibold text-content flex items-center gap-2"><Tag size={20} className="text-primary-glow" /> Categorias</h2>
+          <span className="text-[10px] font-bold text-muted bg-surface/80 px-2 py-1 rounded-full border border-border shadow-sm">Ativas: {categories.length}</span>
+        </div>
 
-        {/* CATEGORIES */}
-        <section className="bg-surface/50 border border-border rounded-2xl p-6 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12" />
-          <div className="flex items-center justify-between mb-4 relative z-10">
-            <h2 className="text-xl font-semibold text-content flex items-center gap-2"><Tag size={20} className="text-primary-glow" /> Categorias</h2>
-            <span className="text-[10px] font-bold text-muted bg-surface/80 px-2 py-1 rounded-full border border-border shadow-sm">Ativas: {categories.length}</span>
-          </div>
-
-          <div className="bg-background/40 border border-border rounded-xl p-2 max-h-72 overflow-y-auto space-y-1 mb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10">
-            {categories.map(cat => {
-              const IconComp = ICON_MAP[cat.icon] || ICON_MAP[cat.icone] || ICON_MAP['Tag'];
-              const displayColor = cat.color || cat.cor || '#a1a1aa';
-              return (
-                <div key={cat.id} className="group flex justify-between items-center p-2 rounded-lg transition-all border border-transparent hover:bg-surface hover:shadow-sm">
-                  <span className="text-sm font-medium flex items-center gap-3">
-                    <div className="p-1.5 rounded-lg bg-surface border shadow-xs flex items-center justify-center transition-transform group-hover:scale-110" style={{ borderColor: `${displayColor}40` }}>
-                      <IconComp size={16} style={{ color: displayColor }} />
-                    </div>
-                    <span style={{ color: displayColor }}>{cat.name}</span>
-                    {!cat.user_id && <span className="text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest px-1.5 py-0.5 rounded ml-2">Padrão</span>}
-                  </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button type="button" onClick={() => openEditCatModal(cat)} className="p-1.5 text-muted hover:text-cyan-400 rounded-lg hover:bg-background/50 transition-colors" title="Editar"><Edit2 size={16} /></button>
-                    {cat.user_id === user.id ? (
-                      <button type="button" onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-muted hover:text-rose-400 rounded-lg hover:bg-background/50 transition-colors" title="Excluir"><Trash2 size={16} /></button>
-                    ) : (
-                      <span className="p-1.5 text-muted/20 cursor-not-allowed" title="Categorias globais não editáveis"><Trash2 size={16}/></span>
-                    )}
+        <div className="bg-background/40 border border-border rounded-xl p-2 max-h-72 overflow-y-auto space-y-1 mb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10">
+          {categories.map(cat => {
+            const IconComp = ICON_MAP[cat.icon] || ICON_MAP[cat.icone] || ICON_MAP['Tag'];
+            const displayColor = cat.color || cat.cor || '#a1a1aa';
+            return (
+              <div key={cat.id} className="group flex justify-between items-center p-2 rounded-lg transition-all border border-transparent hover:bg-surface hover:shadow-sm">
+                <span className="text-sm font-medium flex items-center gap-3">
+                  <div className="p-1.5 rounded-lg bg-surface border shadow-xs flex items-center justify-center transition-transform group-hover:scale-110" style={{ borderColor: `${displayColor}40` }}>
+                    <IconComp size={16} style={{ color: displayColor }} />
                   </div>
+                  <span style={{ color: displayColor }}>{cat.name}</span>
+                  {!cat.user_id && <span className="text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest px-1.5 py-0.5 rounded ml-2">Padrão</span>}
+                </span>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button type="button" onClick={() => openEditCatModal(cat)} className="p-1.5 text-muted hover:text-cyan-400 rounded-lg hover:bg-background/50 transition-colors" title="Editar"><Edit2 size={16} /></button>
+                  {cat.user_id === user.id ? (
+                    <button type="button" onClick={() => handleDeleteCategory(cat)} className="p-1.5 text-muted hover:text-rose-400 rounded-lg hover:bg-background/50 transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                  ) : (
+                    <span className="p-1.5 text-muted/20 cursor-not-allowed" title="Categorias globais não editáveis"><Trash2 size={16}/></span>
+                  )}
                 </div>
-              );
-            })}
-            {categories.length === 0 && <p className="p-4 text-center text-xs text-muted">Nenhuma categoria encontrada.</p>}
-          </div>
+              </div>
+            );
+          })}
+          {categories.length === 0 && <p className="p-4 text-center text-xs text-muted">Nenhuma categoria encontrada.</p>}
+        </div>
 
-          <button
-            type="button"
-            onClick={openNewCatModal}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-all font-bold text-sm shadow-sm relative z-10"
-          >
-            <Plus size={18} /> Criar Nova Categoria
-          </button>
-        </section>
-      </div>
+        <button
+          type="button"
+          onClick={openNewCatModal}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-all font-bold text-sm shadow-sm relative z-10"
+        >
+          <Plus size={18} /> Criar Nova Categoria
+        </button>
+      </section>
 
       {/* ── DANGER ZONE ── full width */}
       <section className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-6 shadow-sm">
@@ -630,7 +758,7 @@ export default function Settings() {
               <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Trash2 size={24} /></div>
               <div>
                 <p className="text-sm font-bold text-content">Zerar Dashboard Atual</p>
-                <p className="text-xs text-muted mt-1 leading-relaxed">Remove irremediavelmente todas as receitas e despesas vinculadas a este workspace.</p>
+                <p className="text-xs text-rose-500/80 mt-1 leading-relaxed">Remove irremediavelmente todas as receitas e despesas vinculadas a este workspace. <b>Digite "CONFIRMAR LIMPEZA" abaixo para habilitar.</b></p>
               </div>
             </div>
             <div className="space-y-3">
@@ -653,7 +781,7 @@ export default function Settings() {
               <div className="p-2 bg-rose-500/10 rounded-xl text-rose-500"><X size={24} /></div>
               <div>
                 <p className="text-sm font-bold text-content">Excluir Conta Permanentemente</p>
-                <p className="text-xs text-muted mt-1 leading-relaxed">Apaga seu perfil e todos os seus dados pessoais de todos os grupos.</p>
+                <p className="text-xs text-rose-500/80 mt-1 leading-relaxed">Apaga seu perfil e todos os seus dados pessoais de todos os grupos. <b>Digite "CONFIRMAR EXCLUSÃO" abaixo para habilitar.</b></p>
               </div>
             </div>
             <div className="space-y-3">
@@ -768,6 +896,121 @@ export default function Settings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ═══════════════════════════════════════ */}
+      {/* NEW WORKSPACE MODAL                     */}
+      {/* ═══════════════════════════════════════ */}
+      {showNewWorkspaceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowNewWorkspaceModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: newWorkspaceColor }} />
+
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+              <h3 className="text-lg font-bold text-content">Criar Novo Workspace</h3>
+              <button type="button" onClick={() => setShowNewWorkspaceModal(false)} className="p-1.5 rounded-lg text-muted hover:text-content hover:bg-border transition-colors"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleCreateWorkspace} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs text-muted font-bold uppercase tracking-wide">Nome do Novo Espaço</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Família Silva, Viagem Europa..."
+                  value={newWorkspaceName}
+                  onChange={e => setNewWorkspaceName(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full bg-background/80 border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-content focus:outline-none focus:border-primary/50 transition-all"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs text-muted font-bold uppercase tracking-wide block">Cor de Identificação</label>
+                <div className="flex flex-wrap gap-3 p-3 bg-background/50 border border-border/50 rounded-xl">
+                  {AVAILABLE_COLORS.map(c => (
+                    <button
+                      key={c.name} type="button"
+                      onClick={() => setNewWorkspaceColor(c.hex)}
+                      className={cn("w-9 h-9 rounded-full border-2 transition-transform flex items-center justify-center", newWorkspaceColor === c.hex ? "scale-125 border-white shadow-md z-10" : "border-transparent hover:scale-110 opacity-80 hover:opacity-100")}
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    >
+                      {newWorkspaceColor === c.hex && <Check size={14} className="text-white" strokeWidth={3} />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowNewWorkspaceModal(false)} className="flex-1 py-2.5 rounded-xl border border-border text-muted hover:text-content hover:bg-border transition-colors font-medium text-sm">Cancelar</button>
+                <button 
+                  type="submit" 
+                  disabled={creatingWorkspace}
+                  className="flex-1 bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary font-bold py-2.5 rounded-xl transition-all flex justify-center items-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  {creatingWorkspace ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                  Criar Agora
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE GROUP MODAL */}
+      {showDeleteGroupModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-rose-500/30 w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-rose-500 mb-4">
+              <div className="p-3 bg-rose-500/10 rounded-2xl">
+                <AlertTriangle size={24} />
+              </div>
+              <h2 className="text-xl font-bold">Excluir Workspace?</h2>
+            </div>
+            
+            <p className="text-sm text-zinc-400 mb-6 leading-relaxed">
+              Esta ação é <span className="text-rose-400 font-bold underline">irreversível</span>. 
+              Todos os dados, membros e histórico financeiro deste espaço serão apagados permanentemente.
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-[10px] text-zinc-500 font-bold tracking-widest pl-1">
+                  DIGITE <span className="text-zinc-200">"{userGroups.find(g => g.id === activeGroupId)?.nome}"</span> PARA CONFIRMAR:
+                </p>
+                <input 
+                  type="text" 
+                  autoFocus
+                  value={deleteGroupNameConfirm}
+                  onChange={e => setDeleteGroupNameConfirm(e.target.value)}
+                  placeholder="Nome do Workspace"
+                  className="w-full bg-zinc-800 border border-rose-500/20 focus:border-rose-500/50 rounded-xl px-4 py-3 text-zinc-100 focus:outline-none transition-all font-medium"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setShowDeleteGroupModal(false)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-750 text-white px-4 py-3 rounded-xl font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteGroup}
+                  disabled={isDeletingGroup || deleteGroupNameConfirm.trim().toUpperCase() !== (userGroups.find(g => g.id === activeGroupId)?.nome || '').trim().toUpperCase()}
+                  className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:opacity-30 disabled:grayscale text-white px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                >
+                  {isDeletingGroup ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  Excluir Agora
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

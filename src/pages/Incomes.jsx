@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, DollarSign, Loader2, Trash2, Edit2, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { registrarLogAtividade } from '../lib/activityLogger';
+import UserAvatar from '../components/common/UserAvatar';
 
 export default function Incomes() {
   const { user, showBalances, activeGroupId } = useAuth();
@@ -35,7 +37,7 @@ export default function Incomes() {
       setLoading(true);
       const { data, error } = await supabase
         .from('incomes')
-        .select('*')
+        .select('*, profiles(full_name, avatar_url, email)')
         .eq('grupo_id', activeGroupId)
         .order('month', { ascending: false });
         
@@ -68,9 +70,11 @@ export default function Incomes() {
       if (editingId) {
         const { error } = await supabase.from('incomes').update(payload).eq('id', editingId);
         if (error) throw error;
+        registrarLogAtividade(activeGroupId, 'EDITOU', 'RENDA', `Alterou a renda "${description}" para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(grossAmount))}`);
       } else {
         const { error } = await supabase.from('incomes').insert([payload]);
         if (error) throw error;
+        registrarLogAtividade(activeGroupId, 'CRIOU', 'RENDA', `Adicionou a renda "${description}" no valor de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(grossAmount))}`);
       }
       
       handleCancelEdit();
@@ -102,9 +106,15 @@ export default function Incomes() {
   };
 
   const handleDelete = async (id) => {
+    const incomeToDelete = incomes.find(inc => inc.id === id);
     if(!window.confirm('Tem certeza em excluir esta renda?')) return;
     const { error } = await supabase.from('incomes').delete().eq('id', id);
-    if (!error) fetchIncomes();
+    if (!error) {
+      if (incomeToDelete) {
+        registrarLogAtividade(activeGroupId, 'EXCLUIU', 'RENDA', `Removeu a renda "${incomeToDelete.description}"`);
+      }
+      fetchIncomes();
+    }
   };
 
   const formatCurrency = (value) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value) : 'R$ ****';
@@ -266,11 +276,14 @@ export default function Incomes() {
                                  )}>
                                    {inc.type || 'Salário'}
                                  </span>
-                                 <p className="font-semibold text-content">{inc.description || 'Renda sem descrição'}</p>
+                                 <p className="font-semibold text-content text-sm md:text-base">{inc.description || 'Renda sem descrição'}</p>
                                </div>
-                               <div className="flex flex-wrap gap-x-6 gap-y-1 mt-1 text-sm">
-                                 <span className="text-muted flex items-center gap-1">Bruto: <span className="text-content">{formatCurrency(inc.gross_amount)}</span></span>
-                                 {inc.discounts > 0 && <span className="text-red-400/80 flex items-center gap-1">Desc: <span>{formatCurrency(inc.discounts)}</span></span>}
+                               <div className="flex items-center gap-2 mt-1">
+                                 <UserAvatar nameOrEmail={inc.profiles?.full_name || inc.profiles?.email} size="sm" />
+                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] md:text-xs text-muted">
+                                   <span>Bruto: <span className="text-content font-medium">{formatCurrency(inc.gross_amount)}</span></span>
+                                   {inc.discounts > 0 && <span className="text-red-400/80">Desc: <span className="font-medium">{formatCurrency(inc.discounts)}</span></span>}
+                                 </div>
                                </div>
                              </div>
 

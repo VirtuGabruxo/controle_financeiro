@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark } from 'lucide-react';
 import { cn } from '../lib/utils';
 import UserAvatar from '../components/common/UserAvatar';
+import { registrarLogAtividade } from '../lib/activityLogger';
 
 export default function Expenses() {
   const { user, showBalances, activeGroupId } = useAuth();
@@ -110,6 +111,7 @@ export default function Expenses() {
           amount: parseFloat(amount),
           expense_date: expenseDate,
         }).eq('id', editingId);
+        registrarLogAtividade(activeGroupId, 'EDITOU', 'DESPESA', `Alterou a despesa "${description}" para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(amount))}`);
       } else {
         const qty = isRecurring ? 24 : parseInt(installments || '1');
         const baseAmount = (isRecurring || isLoan) ? parseFloat(amount) : (parseFloat(amount) / qty);
@@ -129,6 +131,7 @@ export default function Expenses() {
           d.setMonth(d.getMonth() + 1);
         }
         await supabase.from('expenses').insert(payloads);
+        registrarLogAtividade(activeGroupId, 'CRIOU', 'DESPESA', `Adicionou a despesa "${description}" no valor de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(amount))}`);
       }
 
       handleCancelEdit();
@@ -186,9 +189,15 @@ export default function Expenses() {
   };
 
   const handleDelete = async (id) => {
+    const expenseToDelete = expenses.find(e => e.id === id);
     if (!window.confirm('Excluir esta despesa permanentemente?')) return;
     const { error } = await supabase.from('expenses').delete().eq('id', id);
-    if (!error) fetchExpenses();
+    if (!error) {
+      if (expenseToDelete) {
+        registrarLogAtividade(activeGroupId, 'EXCLUIU', 'DESPESA', `Removeu a despesa "${expenseToDelete.description}"`);
+      }
+      fetchExpenses();
+    }
   };
 
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));

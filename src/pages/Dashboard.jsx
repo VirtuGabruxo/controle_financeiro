@@ -6,6 +6,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as PieTooltip, BarCha
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import UserAvatar from '../components/common/UserAvatar';
+import TimelineAtividades from '../components/common/TimelineAtividades';
 
 const fmtBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 const fmtBRLShort = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
@@ -20,13 +21,11 @@ export default function Dashboard() {
   const [expensesByCategory, setExpensesByCategory] = useState([]);
   const [evolutionData, setEvolutionData] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [recentTransactions, setRecentTransactions] = useState([]);
   
   useEffect(() => {
     if (activeGroupId) {
       fetchDashboardData();
       fetchNotifications();
-      fetchRecentTransactions();
     }
   }, [user, currentMonth, profile, activeGroupId]);
 
@@ -132,11 +131,7 @@ export default function Dashboard() {
     }
   };
 
-  const fetchRecentTransactions = async () => {
-    if (!activeGroupId) return;
-    const { data: exps } = await supabase.from('expenses').select('id, description, amount, expense_date, type:expense_type, profiles(full_name, avatar_url, email)').eq('grupo_id', activeGroupId).order('expense_date', { ascending: false }).limit(5);
-    setRecentTransactions(exps || []);
-  };
+
 
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const goNextMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
@@ -257,30 +252,9 @@ export default function Dashboard() {
            ) : <div className="h-48 md:h-64 flex items-center justify-center text-muted border border-dashed border-border/50 rounded-xl text-sm">Sem despesas neste mês.</div>}
          </div>
          
-          {/* Recent Transactions List with Identity */}
+          {/* Timeline de Atividades do Workspace */}
           <div className="bg-surface/40 border border-border rounded-2xl p-5 md:p-6 w-full">
-            <h3 className="text-base md:text-lg font-semibold mb-4 md:mb-6 text-content">Últimas Transações</h3>
-            <div className="space-y-4">
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map(tx => (
-                  <div key={tx.id} className="flex items-center justify-between gap-4 p-2 rounded-xl hover:bg-background/40 transition-colors">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <UserAvatar nameOrEmail={tx.profiles?.full_name || tx.profiles?.email} size="sm" />
-                      <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-content truncate leading-tight">{tx.description}</p>
-                        <p className="text-[10px] text-muted mt-0.5">{new Date(tx.expense_date).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-rose-400 whitespace-nowrap">
-                      -{fmtBRL(tx.amount)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-center text-muted py-4">Nenhuma transação recente no grupo.</p>
-              )}
-            </div>
-            <Link to="/expenses" className="block text-center text-xs text-primary-glow font-bold mt-6 hover:underline">Ver todas</Link>
+            <TimelineAtividades />
           </div>
           
           {/* Intelligent Insights */}

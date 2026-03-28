@@ -23,13 +23,14 @@ export const AuthProvider = ({ children }) => {
   const fetchUserGroups = async (userId) => {
     const { data: memberships } = await supabase
       .from('membros_grupo')
-      .select('grupo_id, papel, grupos(id, nome)')
+      .select('grupo_id, papel, grupos(id, nome, cor)')
       .eq('user_id', userId);
     
     if (memberships) {
       const groups = memberships.map(m => ({
         id: m.grupos.id,
         nome: m.grupos.nome,
+        cor: m.grupos.cor,
         papel: m.papel
       }));
       setUserGroups(groups);
