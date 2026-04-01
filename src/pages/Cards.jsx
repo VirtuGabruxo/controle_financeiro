@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, Plus, Loader2, Trash2, X, Edit2 } from 'lucide-react';
+import { CreditCard, Plus, Loader2, Trash2, X, Edit2, CheckCircle2, Receipt } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 export default function Cards() {
   const { user, showBalances, activeGroupId } = useAuth();
@@ -23,13 +24,14 @@ export default function Cards() {
     setLoading(true);
     try {
       const { data: cardsData, error: errC } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
+      console.log('DEBUG CARDS PAGE:', { activeGroupId, cardsData, errC });
       if (errC) throw errC;
 
       const { data: pendingExp, error: errE } = await supabase
         .from('expenses')
-        .select('card_id, amount')
+        .select('card_id, amount, expense_date')
         .eq('grupo_id', activeGroupId)
-        .eq('status', 'pending')
+        .eq('paga', false)
         .not('card_id', 'is', null);
       if (errE) throw errE;
 
@@ -49,7 +51,17 @@ export default function Cards() {
 
       const enhancedCards = cardsData.map(card => {
         const totalPending = pendingExp.filter(e => e.card_id === card.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
-        const currentInvoice = (monthExp || []).filter(e => e.card_id === card.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
+        
+        // Fatura do Ciclo Atual (Acumulado até o fechamento deste mês)
+        const today = new Date();
+        const refClosing = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
+        refClosing.setHours(23, 59, 59, 999);
+        const refClosingStr = refClosing.toISOString().split('T')[0];
+
+        const currentInvoice = pendingExp
+          .filter(e => e.card_id === card.id && e.expense_date <= refClosingStr)
+          .reduce((acc, curr) => acc + Number(curr.amount), 0);
+
         const limit = Number(card.credit_limit || 0);
         const available = Math.max(limit - totalPending, 0);
         const consumedPct = limit > 0 ? (totalPending / limit) * 100 : 0;
@@ -59,9 +71,46 @@ export default function Cards() {
 
       setCards(enhancedCards);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao carregar dados dos cartões:", error);
+      // Se o erro for de coluna ausente (42703), podemos ainda mostrar os cartões sem o cálculo de fatura
+      if (error.code === '42703') {
+        alert("Atenção: Algumas funcionalidades de fatura exigem atualização do banco de dados (coluna 'paga' ausente). Peça ao suporte para rodar as migrações.");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePagarFatura = async (card) => {
+    if (!window.confirm(`Confirmar o pagamento da fatura de ${card.name}?\nIsso marcará todas as compras deste ciclo (e anteriores) como pagas.`)) return;
+    
+    setIsSubmitting(true);
+    try {
+      const today = new Date();
+      const closingDate = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
+      closingDate.setHours(23, 59, 59, 999);
+      
+      const { error } = await supabase
+        .from('expenses')
+        .update({ paga: true, status: 'paid' })
+        .eq('card_id', card.id)
+        .eq('paga', false)
+        .lte('expense_date', closingDate.toISOString().split('T')[0]);
+
+      if (error) throw error;
+      
+      alert('Fatura paga com sucesso! 🎉');
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: [card.color, '#ffffff', '#10b981']
+      });
+      fetchCardsData();
+    } catch (error) {
+      alert('Erro ao processar pagamento: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -177,6 +226,17 @@ export default function Cards() {
                      <span className="text-muted">Total: {formatCurrency(c.credit_limit)}</span>
                    </div>
                  </div>
+
+                 {c.currentInvoice > 0 && (
+                   <button 
+                     onClick={() => handlePagarFatura(c)}
+                     disabled={isSubmitting}
+                     className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-xl text-[11px] font-bold transition-all shadow-sm group/btn"
+                   >
+                     {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} className="group-hover/btn:scale-110 transition-transform" />}
+                     PAGAR FATURA ATUAL
+                   </button>
+                 )}
                </div>
                
                <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-white z-0 pointer-events-none transform translate-x-4 -translate-y-4">

@@ -18,8 +18,8 @@ export default function NotificacaoConvite() {
     try {
       const { data, error } = await supabase
         .from('convites')
-        .select('*, grupos(id, nome)')
-        .eq('email_convidado', user.email.toLowerCase())
+        .select('*') // Consulta simples sem junções perigosas
+        .eq('email_convidado', user.email.trim().toLowerCase())
         .eq('status', 'pendente');
 
       if (error) throw error;
@@ -28,6 +28,37 @@ export default function NotificacaoConvite() {
       console.error("Erro ao carregar convites:", err);
     }
   };
+
+  useEffect(() => {
+    if (!user?.email) return;
+
+    // Subscreve em tempo real para novos convites
+    const channel = supabase
+      .channel('convites_realtime')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'convites',
+        filter: `email_convidado=eq.${user.email.trim().toLowerCase()}`
+      }, (payload) => {
+        // Quando um novo convite for inserido, recarregamos a lista
+        fetchInvites();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'convites',
+        filter: `email_convidado=eq.${user.email.trim().toLowerCase()}`
+      }, (payload) => {
+        // Se o status mudar ou for deletado localmente, recarregamos
+        fetchInvites();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const handleAction = async (invite, action) => {
     setProcessingId(invite.id);
@@ -56,7 +87,7 @@ export default function NotificacaoConvite() {
         // 3. Forçar refresh do estado global (AppContext/AuthContext)
         if (refreshGroups) await refreshGroups();
         
-        alert(`Sucesso! Você agora faz parte do workspace "${invite.grupos.nome}"`);
+        alert(`Sucesso! Você agora faz parte do novo workspace.`);
       } else {
         // Recusar convite
         const { error: declineError } = await supabase
@@ -87,7 +118,7 @@ export default function NotificacaoConvite() {
       <div className="flex items-center gap-3">
         <Users size={20} className="hidden sm:block" />
         <p className="text-sm font-medium">
-          Você foi convidado para o workspace <span className="font-bold underline">"{currentInvite.grupos.nome}"</span>
+          Você foi convidado para um <span className="font-bold underline">Novo Workspace</span>
         </p>
       </div>
 

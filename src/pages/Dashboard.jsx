@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Wallet, TrendingUp, TrendingDown, RefreshCcw, ChevronLeft, ChevronRight, Bell } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, RefreshCcw, ChevronLeft, ChevronRight, Bell, Check } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as PieTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as BarTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
@@ -37,22 +37,28 @@ export default function Dashboard() {
     
     const today = new Date();
     today.setHours(0,0,0,0);
+    const todayDay = today.getDate();
     
-    // We look up to X days ahead
+    // Dias de antecedência recuperados das configurações do Workspace (Profile)
+    const daysAdvance = profile?.dias_antecedencia || 5; 
     const maxDate = new Date();
-    maxDate.setDate(today.getDate() + (profile.dias_antecedencia || 7));
+    maxDate.setDate(today.getDate() + daysAdvance);
     const maxDateStr = `${maxDate.getFullYear()}-${String(maxDate.getMonth()+1).padStart(2,'0')}-${String(maxDate.getDate()).padStart(2,'0')}T23:59:59`;
 
-    const { data: pendingExpenses } = await supabase
+    // 1. Débito/Pix/Dinheiro (Individuais)
+    const { data: individualPending } = await supabase
       .from('expenses')
       .select('id, description, amount, expense_date, expense_type, cards(name)')
       .eq('grupo_id', activeGroupId)
-      .eq('status', 'pending')
+      .is('card_id', null)
+      .eq('paga', false)
       .lte('expense_date', maxDateStr)
       .order('expense_date', { ascending: true });
 
-    if (pendingExpenses) {
-      const alerts = pendingExpenses.map(exp => {
+    let alerts = [];
+
+    if (individualPending) {
+      alerts = individualPending.map(exp => {
          const expDate = new Date(exp.expense_date + "T00:00:00");
          const diffTime = expDate - today;
          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -68,9 +74,97 @@ export default function Dashboard() {
             message = 'Vence HOJE';
          }
 
-         return { ...exp, diffDays, urgency, message };
+         return { ...exp, diffDays, urgency, message, type: 'individual' };
       });
-      setNotifications(alerts);
+    }
+
+    // 2. Faturas de Cartão (Consolidadas)
+    const { data: cards } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId);
+    
+    if (cards) {
+      for (const card of cards) {
+        // LÓGICA DE CICLO INTELIGENTE:
+        // Identificamos qual ciclo o usuário precisa pagar AGORA.
+        // Se hoje > fechamento_mensal, a fatura pendente é a que fechou NESTE mês.
+        // Se hoje <= fechamento_mensal, a fatura pendente é a que fechou no MÊS PASSADO.
+        const isAfterClosing = todayDay > card.closing_day;
+        const refMonth = isAfterClosing ? today.getMonth() : today.getMonth() - 1;
+        const refYear = today.getFullYear();
+
+        const closingDate = new Date(refYear, refMonth, card.closing_day);
+        closingDate.setHours(23, 59, 59, 999);
+        const closingDateStr = closingDate.toISOString().split('T')[0];
+        
+        // CÁLCULO DE VENCIMENTO (DUE DATE):
+        // Se dia_vencimento < dia_fechamento (ex: fecha 26 e vence 02), o vencimento é no mês seguinte ao fechamento.
+        let dueDate = new Date(refYear, refMonth, card.due_day);
+        if (card.due_day < card.closing_day) {
+          dueDate.setMonth(dueDate.getMonth() + 1);
+        }
+
+        // Buscamos despesas vinculadas a este cartão que não foram pagas (ou NULL) e pertencem a este ciclo (<= fechamento)
+        const { data: cardExpenses } = await supabase
+          .from('expenses')
+          .select('amount, paga')
+          .eq('card_id', card.id)
+          .or('paga.eq.false,paga.is.null')
+          .lte('expense_date', closingDateStr);
+
+        const totalBill = cardExpenses?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+        
+        console.log(`[DEBUG NOTIF] Cartão: ${card.name}`, { 
+          totalBill, 
+          diffDays: Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24)),
+          daysAdvance,
+          closingDateStr
+        });
+
+        if (totalBill > 0) {
+          // Dias para o vencimento real
+          const diffTime = dueDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays <= daysAdvance) {
+            alerts.push({
+              id: `card-${card.id}`,
+              description: `Fatura de ${card.name}`,
+              amount: totalBill,
+              urgency: diffDays <= 0 ? 'danger' : 'warning',
+              message: diffDays < 0 ? `Atrasada há ${Math.abs(diffDays)} dia${Math.abs(diffDays)>1?'s':''}` : (diffDays === 0 ? 'Vence HOJE' : `Vence em ${diffDays} dia${diffDays>1?'s':''}`),
+              type: 'card_bill',
+              expense_type: 'card',
+              card_id: card.id,
+              card_name: card.name,
+              target_closing_date: closingDateStr, // Passamos a data exata para o pagamento
+              diffDays
+            });
+          }
+        }
+      }
+    }
+
+    setNotifications(alerts.sort((a,b) => (a.diffDays || 0) - (b.diffDays || 0)));
+  };
+
+  const handlePagarFaturaDashboard = async (notif) => {
+    if (!window.confirm(`Deseja confirmar o pagamento da fatura de ${notif.card_name} no valor de ${formatCurrency(notif.amount)}?`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ paga: true, status: 'paid' })
+        .eq('card_id', notif.card_id)
+        .eq('paga', false)
+        .lte('expense_date', notif.target_closing_date); // Usamos a data consolidada no alerta
+
+      if (error) throw error;
+      
+      alert('Pagamento confirmado com sucesso!');
+      fetchNotifications();
+      fetchDashboardData();
+    } catch (error) {
+       alert('Erro ao processar pagamento.');
+       console.error(error);
     }
   };
 
@@ -173,8 +267,8 @@ export default function Dashboard() {
                    <p className="font-semibold text-content text-sm md:text-base flex flex-wrap items-center gap-2">
                      {notif.description} 
                      {notif.expense_type === 'loan' && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded uppercase font-bold border border-purple-500/30">Empréstimo</span>}
-                     {notif.cards?.name ? (
-                       <span className="text-[10px] bg-zinc-500/20 text-muted px-1.5 py-0.5 rounded uppercase border border-border">💳 {notif.cards.name}</span>
+                     {notif.card_name || notif.cards?.name ? (
+                       <span className="text-[10px] bg-zinc-500/20 text-muted px-1.5 py-0.5 rounded uppercase border border-border">💳 {notif.card_name || notif.cards?.name}</span>
                      ) : (
                        <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded uppercase border border-emerald-500/30">💸 Débito</span>
                      )}
@@ -184,9 +278,18 @@ export default function Dashboard() {
                    </p>
                  </div>
                </div>
-               <Link to="/expenses" className="text-xs md:text-sm px-4 py-2 font-medium bg-background text-content rounded-lg border border-border hover:bg-surface transition-colors flex items-center justify-center gap-2 whitespace-nowrap self-end sm:self-auto">
-                 Pagar Agora <ChevronRight size={14}/>
-               </Link>
+               {notif.type === 'card_bill' ? (
+                 <button 
+                   onClick={() => handlePagarFaturaDashboard(notif)} 
+                   className="text-xs md:text-sm px-4 py-2 font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 whitespace-nowrap self-end sm:self-auto"
+                 >
+                   Confirmar Pagamento <Check size={14}/>
+                 </button>
+               ) : (
+                 <Link to="/expenses" className="text-xs md:text-sm px-4 py-2 font-medium bg-background text-content rounded-lg border border-border hover:bg-surface transition-colors flex items-center justify-center gap-2 whitespace-nowrap self-end sm:self-auto">
+                   Pagar Agora <ChevronRight size={14}/>
+                 </Link>
+               )}
             </div>
           ))}
         </div>

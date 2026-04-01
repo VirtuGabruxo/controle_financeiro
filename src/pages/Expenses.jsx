@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, identificarMesFatura } from '../lib/utils';
 import UserAvatar from '../components/common/UserAvatar';
 import { registrarLogAtividade } from '../lib/activityLogger';
 
@@ -41,8 +41,8 @@ export default function Expenses() {
   const [cardForm, setCardForm] = useState({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
 
-  useEffect(() => { fetchCoreData(); }, [user]);
-  useEffect(() => { fetchExpenses(); }, [user, currentMonth]);
+  useEffect(() => { fetchCoreData(); }, [user, activeGroupId]);
+  useEffect(() => { fetchExpenses(); }, [user, currentMonth, activeGroupId]);
 
   const fetchCoreData = async () => {
     if (!activeGroupId) return;
@@ -76,10 +76,13 @@ export default function Expenses() {
         .select('*')
         .eq('grupo_id', activeGroupId)
         .not('card_id', 'is', null)
-        .eq('status', 'pending');
+        .eq('paga', false);
       setUnpaidExpensesGlobal(globalData || []);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao buscar despesas:", error);
+      if (error.code === '42703') {
+        alert("Erro estrutural no banco: Coluna 'paga' ausente. Rodar update_schema.sql no Supabase.");
+      }
     } finally {
       setLoading(false);
     }
@@ -161,9 +164,18 @@ export default function Expenses() {
   };
 
   const toggleStatus = async (exp) => {
-    const newStatus = exp.status === 'paid' ? 'pending' : 'paid';
-    const { error } = await supabase.from('expenses').update({ status: newStatus }).eq('id', exp.id);
-    if (!error) setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, status: newStatus } : e));
+    const isNowPaid = !exp.paga;
+    const { error } = await supabase.from('expenses').update({ 
+      paga: isNowPaid, 
+      status: isNowPaid ? 'paid' : 'pending' 
+    }).eq('id', exp.id);
+    if (!error) {
+      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, paga: isNowPaid, status: isNowPaid ? 'paid' : 'pending' } : e));
+      // Se for cartão, atualizar global pra refletir no limite
+      if (exp.card_id) {
+        setUnpaidExpensesGlobal(prev => isNowPaid ? prev.filter(p => p.id !== exp.id) : [...prev, { ...exp, paga: isNowPaid }]);
+      }
+    }
   };
 
   const handleEdit = (exp) => {
@@ -202,6 +214,34 @@ export default function Expenses() {
 
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const goNextMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+
+  const handlePayInvoice = async (card) => {
+    if (!window.confirm(`Confirmar o pagamento da fatura de ${card.name}?`)) return;
+    
+    setDangerLoading(true);
+    try {
+      const today = new Date();
+      const closingDate = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
+      closingDate.setHours(23, 59, 59, 999);
+      
+      const { error } = await supabase
+        .from('expenses')
+        .update({ paga: true, status: 'paid' })
+        .eq('card_id', card.id)
+        .eq('paga', false)
+        .lte('expense_date', closingDate.toISOString().split('T')[0]);
+
+      if (error) throw error;
+      
+      alert('Fatura paga com sucesso!');
+      fetchExpenses();
+      fetchCoreData();
+    } catch (error) {
+      alert('Erro ao processar pagamento.');
+    } finally {
+      setDangerLoading(false);
+    }
+  };
 
   const formatCurrency = (val) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val) : 'R$ ****';
   const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentMonth);
@@ -257,6 +297,17 @@ export default function Expenses() {
               </div>
             </div>
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-content z-0 pointer-events-none"><CreditCard size={80} /></div>
+            
+            {c.invoiceTotal > 0 && (
+              <button 
+                onClick={() => handlePayInvoice(c)}
+                disabled={dangerLoading}
+                className="w-full mt-3 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-xl text-[10px] font-bold transition-all shadow-sm"
+              >
+                {dangerLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                PAGAR FATURA
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -296,7 +347,7 @@ export default function Expenses() {
             <div className="space-y-3 md:space-y-4">
               {filteredList.map(exp => {
                 const card = exp.cards;
-                const isPaid = exp.status === 'paid';
+                const isPaid = exp.paga || exp.status === 'paid';
 
                 return (
                   <div key={exp.id} className={cn(
@@ -308,15 +359,20 @@ export default function Expenses() {
 
                     <div className="flex items-center gap-4 flex-1">
                       <button onClick={() => toggleStatus(exp)} className="p-1 -m-1 transition-colors flex-shrink-0">
-                        {isPaid ? <CheckCircle2 className="text-primary" size={24} /> : <Circle className="text-zinc-500 hover:text-primary-glow" size={24} />}
+                        {isPaid ? <CheckCircle2 className="text-emerald-500" size={24} /> : <Circle className="text-zinc-500 hover:text-primary-glow" size={24} />}
                       </button>
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           {card ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border" style={{ backgroundColor: `${card.color}20`, color: card.color, borderColor: `${card.color}40` }}>
-                              💳 {card.name}
-                            </span>
+                            <>
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border" style={{ backgroundColor: `${card.color}20`, color: card.color, borderColor: `${card.color}40` }}>
+                                💳 {card.name}
+                              </span>
+                              <span className="text-[10px] bg-zinc-500/10 text-muted border border-border/50 px-1.5 py-0.5 rounded uppercase font-bold">
+                                Fatura: {identificarMesFatura(exp.expense_date, card.closing_day)}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 border border-zinc-500/30">Débito/Dinheiro</span>
                           )}
