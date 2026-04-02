@@ -123,7 +123,12 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (email, password) => supabase.auth.signUp({ email, password });
   const signIn = async (email, password) => supabase.auth.signInWithPassword({ email, password });
-  const signOut = async () => supabase.auth.signOut();
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace('/login');
+  };
   const resetPassword = async (email) => {
     const redirectTo = `${window.location.origin}/update-password`;
     return supabase.auth.resetPasswordForEmail(email, { redirectTo });
