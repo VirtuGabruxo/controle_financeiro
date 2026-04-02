@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, DollarSign, CreditCard, LogOut, Settings as SettingsIcon, Eye, EyeOff, Target, PieChart, LineChart, FileDown } from 'lucide-react';
+import { Home, DollarSign, CreditCard, LogOut, Settings as SettingsIcon, Eye, EyeOff, Target, PieChart, LineChart, FileDown, RefreshCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import GroupSelector from './GroupSelector';
@@ -14,6 +14,7 @@ export default function Sidebar() {
     { name: 'Rendas', path: '/incomes', icon: DollarSign },
     { name: 'Despesas', path: '/expenses', icon: CreditCard },
     { name: 'Meus Cartões', path: '/cards', icon: CreditCard },
+    { name: 'Assinaturas', path: '/subscriptions', icon: RefreshCcw },
     { name: 'Caixinhas & Metas', path: '/goals', icon: Target },
     { name: 'Relatórios', path: '/reports', icon: PieChart },
     { name: 'Balanço Geral', path: '/net-worth', icon: LineChart },

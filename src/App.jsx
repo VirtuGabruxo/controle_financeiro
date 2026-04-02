@@ -13,6 +13,7 @@ import Goals from './pages/Goals';
 import Reports from './pages/Reports';
 import NetWorth from './pages/NetWorth';
 import ExportarDados from './pages/ExportarDados';
+import GerenciarAssinaturas from './pages/GerenciarAssinaturas';
 
 import { useIdleTimeout } from './hooks/useIdleTimeout';
 import { Loader2 } from 'lucide-react';
@@ -62,6 +63,7 @@ function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/net-worth" element={<NetWorth />} />
             <Route path="/export" element={<ExportarDados />} />
+            <Route path="/subscriptions" element={<GerenciarAssinaturas />} />
           </Route>
         </Routes>
       </Router>

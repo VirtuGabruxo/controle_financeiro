@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Wallet, TrendingUp, TrendingDown, RefreshCcw, ChevronLeft, ChevronRight, Bell, Check } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as PieTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as BarTooltip } from 'recharts';
 import { Link } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { cn, getCutOffDate } from '../lib/utils';
+import { processarAssinaturasAtivas } from '../lib/subscriptions';
 import UserAvatar from '../components/common/UserAvatar';
 import TimelineAtividades from '../components/common/TimelineAtividades';
 
@@ -26,6 +27,7 @@ export default function Dashboard() {
     if (activeGroupId) {
       fetchDashboardData();
       fetchNotifications();
+      processarAssinaturasAtivas(activeGroupId); // Motor de Recorrências
     }
   }, [user, currentMonth, profile, activeGroupId]);
 
@@ -83,21 +85,12 @@ export default function Dashboard() {
     
     if (cards) {
       for (const card of cards) {
-        // LÓGICA DE CICLO INTELIGENTE:
-        // Identificamos qual ciclo o usuário precisa pagar AGORA.
-        // Se hoje > fechamento_mensal, a fatura pendente é a que fechou NESTE mês.
-        // Se hoje <= fechamento_mensal, a fatura pendente é a que fechou no MÊS PASSADO.
-        const isAfterClosing = todayDay > card.closing_day;
-        const refMonth = isAfterClosing ? today.getMonth() : today.getMonth() - 1;
-        const refYear = today.getFullYear();
-
-        const closingDate = new Date(refYear, refMonth, card.closing_day);
-        closingDate.setHours(23, 59, 59, 999);
-        const closingDateStr = closingDate.toISOString().split('T')[0];
+        // LÓGICA DE CICLO INTELIGENTE (UNIFICADA):
+        const closingDateStr = getCutOffDate(card.closing_day);
         
         // CÁLCULO DE VENCIMENTO (DUE DATE):
-        // Se dia_vencimento < dia_fechamento (ex: fecha 26 e vence 02), o vencimento é no mês seguinte ao fechamento.
-        let dueDate = new Date(refYear, refMonth, card.due_day);
+        let refDate = new Date(closingDateStr + "T12:00:00");
+        let dueDate = new Date(refDate.getFullYear(), refDate.getMonth(), card.due_day);
         if (card.due_day < card.closing_day) {
           dueDate.setMonth(dueDate.getMonth() + 1);
         }

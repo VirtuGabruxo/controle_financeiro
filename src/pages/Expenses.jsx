@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark } from 'lucide-react';
-import { cn, identificarMesFatura } from '../lib/utils';
+import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark, Receipt } from 'lucide-react';
+import { cn, identificarMesFatura, getCutOffDate } from '../lib/utils';
 import UserAvatar from '../components/common/UserAvatar';
 import { registrarLogAtividade } from '../lib/activityLogger';
 
@@ -34,7 +34,7 @@ export default function Expenses() {
   const [categoryId, setCategoryId] = useState('');
   const [cardId, setCardId] = useState('debit');
   const [installments, setInstallments] = useState('1');
-  const [expenseType, setExpenseType] = useState('common'); // 'common', 'fixed', 'loan'
+  const [expenseType, setExpenseType] = useState('common'); // 'common', 'loan'
 
   // Card Manager Modal State
   const [showCardModal, setShowCardModal] = useState(false);
@@ -220,16 +220,13 @@ export default function Expenses() {
     
     setDangerLoading(true);
     try {
-      const today = new Date();
-      const closingDate = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
-      closingDate.setHours(23, 59, 59, 999);
-      
+      const cutOffStr = getCutOffDate(card.closing_day);
       const { error } = await supabase
         .from('expenses')
         .update({ paga: true, status: 'paid' })
         .eq('card_id', card.id)
         .eq('paga', false)
-        .lte('expense_date', closingDate.toISOString().split('T')[0]);
+        .lte('expense_date', cutOffStr);
 
       if (error) throw error;
       
@@ -249,10 +246,16 @@ export default function Expenses() {
   const filteredList = expenses.filter(e => activeTab === 'all' || (activeTab === 'debit' && !e.card_id) || e.card_id === activeTab);
 
   const invoices = cards.map(c => {
-    // Cálculo do limite DEVE ser absoluto (global)
-    const total = unpaidExpensesGlobal.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
-    const pct = c.credit_limit > 0 ? Math.min((total / c.credit_limit) * 100, 100) : 0;
-    return { ...c, invoiceTotal: total, pct };
+    const mesVisivel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(currentMonth);
+    const invoiceTotal = (unpaidExpensesGlobal || []).filter(e => {
+      if (e.card_id !== c.id) return false;
+      const mesFatura = identificarMesFatura(e.expense_date, c.closing_day);
+      return mesFatura.toLowerCase() === mesVisivel.toLowerCase();
+    }).reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+    const totalCommitted = unpaidExpensesGlobal.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const pct = c.credit_limit > 0 ? Math.min((totalCommitted / c.credit_limit) * 100, 100) : 0;
+    return { ...c, invoiceTotal, totalCommitted, pct };
   });
   const debitTotal = expenses.filter(e => !e.card_id).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
@@ -283,14 +286,14 @@ export default function Expenses() {
           <div key={c.id} className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[260px] flex-shrink-0 snap-start relative overflow-hidden">
             <div className="flex justify-between items-center mb-1 relative z-10">
               <span className="text-muted font-medium text-sm flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div> Fatura {c.name}
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div> Fatura: {monthName.split(' ')[0]}
               </span>
               <span className="text-[10px] text-muted font-medium">Vence dia {c.due_day}</span>
             </div>
             <h2 className="text-2xl font-bold text-content mb-3 relative z-10">{formatCurrency(c.invoiceTotal)}</h2>
             <div className="relative z-10">
               <div className="flex justify-between text-[10px] text-muted mb-1">
-                <span>Limite Comprometido</span> <span>{formatCurrency(c.credit_limit || 0)}</span>
+                <span>Limite Comprometido (Total)</span> <span>{formatCurrency(c.totalCommitted)}</span>
               </div>
               <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{ width: `${c.pct}%`, backgroundColor: c.color }}></div>
@@ -336,6 +339,45 @@ export default function Expenses() {
               <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronRight size={18} /></button>
             </div>
           </div>
+
+          {/* Resumo Dinâmico da Fatura quando filtrado por cartão */}
+          {activeTab !== 'all' && activeTab !== 'debit' && cards && Array.isArray(cards) && (() => {
+            try {
+              const selectedCard = cards.find(c => c.id === activeTab);
+              if (!selectedCard) return null;
+
+              // Somar despesas que PERTENCEM à fatura deste mês visualizado (Vencimento)
+              const mesVisivel = currentMonth ? new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(currentMonth) : '';
+              
+              const totalCycle = (unpaidExpensesGlobal || []).filter(e => {
+                if (e.card_id !== selectedCard.id) return false;
+                if (!e.expense_date || !selectedCard.closing_day) return false;
+                const mesFatura = identificarMesFatura(e.expense_date, selectedCard.closing_day);
+                return mesFatura && mesVisivel && mesFatura.toLowerCase() === mesVisivel.toLowerCase();
+              }).reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+              return (
+                <div className="bg-surface/80 border border-border rounded-2xl p-4 flex items-center justify-between shadow-lg mb-4" style={{ borderLeft: `4px solid ${selectedCard.color || '#6366f1'}` }}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-background/50 text-indigo-400">
+                      <Receipt size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted uppercase font-bold tracking-wider">Fatura de {mesVisivel || '...'}</p>
+                      <h3 className="text-xl font-bold text-content">{formatCurrency(totalCycle)}</h3>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted font-medium">Vencimento: <span className="text-content">{(selectedCard.due_day || '00')}/{String(currentMonth.getMonth()+1).padStart(2, '0')}</span></p>
+                    <p className="text-[10px] text-muted font-medium">Fechamento: <span className="text-content">{(selectedCard.closing_day || '00')}/{String(currentMonth.getMonth()).padStart(2, '0') || 12}</span></p>
+                  </div>
+                </div>
+              );
+            } catch (err) {
+              console.error("Erro no resumo de fatura:", err);
+              return null;
+            }
+          })()}
 
           {loading ? (
             <div className="text-muted flex items-center gap-2"><Loader2 className="animate-spin" /> Carregando...</div>
@@ -508,12 +550,9 @@ const ExpenseForm = ({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2 mb-4">
         <label className="text-xs font-semibold text-muted tracking-wide uppercase">TIPO DE LANÇAMENTO</label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" disabled={editingId} onClick={() => setExpenseType('common')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'common' ? "bg-rose-500/10 border-rose-500/50 text-rose-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
             <FileText size={16} className="mb-1" /> Compra Comum
-          </button>
-          <button type="button" disabled={editingId} onClick={() => setExpenseType('fixed')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'fixed' ? "bg-blue-500/10 border-blue-500/50 text-blue-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
-            <Repeat size={16} className="mb-1" /> Assinatura Fixa
           </button>
           <button type="button" disabled={editingId} onClick={() => setExpenseType('loan')} className={cn("py-2 px-2 text-[11px] md:text-xs font-semibold rounded-lg flex flex-col items-center justify-center text-center transition-all border", expenseType === 'loan' ? "bg-purple-500/10 border-purple-500/50 text-purple-500" : "bg-background/80 border-border text-muted hover:text-content disabled:opacity-50")}>
             <Landmark size={16} className="mb-1" /> Empréstimo
@@ -536,7 +575,7 @@ const ExpenseForm = ({
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-muted">Nº Parcelas</label>
-          <input type="number" min="1" max="120" disabled={editingId || expenseType === 'fixed'} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
+          <input type="number" min="1" max="120" disabled={editingId} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
         </div>
       </div>
 
@@ -549,7 +588,7 @@ const ExpenseForm = ({
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-muted">{expenseType === 'fixed' ? 'Dia do Vencimento' : 'Data'}</label>
+          <label className="text-sm font-medium text-muted">Data</label>
           <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
         </div>
       </div>

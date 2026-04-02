@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, Plus, Loader2, Trash2, X, Edit2, CheckCircle2, Receipt } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getCutOffDate } from '../lib/utils';
 
 export default function Cards() {
   const { user, showBalances, activeGroupId } = useAuth();
@@ -24,7 +25,6 @@ export default function Cards() {
     setLoading(true);
     try {
       const { data: cardsData, error: errC } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
-      console.log('DEBUG CARDS PAGE:', { activeGroupId, cardsData, errC });
       if (errC) throw errC;
 
       const { data: pendingExp, error: errE } = await supabase
@@ -35,31 +35,14 @@ export default function Cards() {
         .not('card_id', 'is', null);
       if (errE) throw errE;
 
-      const year = new Date().getFullYear();
-      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
-      const startDay = `${year}-${monthStr}-01T00:00:00`;
-      const lastDayNum = new Date(year, new Date().getMonth() + 1, 0).getDate();
-      const endDay = `${year}-${monthStr}-${lastDayNum}T23:59:59`;
-
-      const { data: monthExp } = await supabase
-        .from('expenses')
-        .select('card_id, amount')
-        .eq('grupo_id', activeGroupId)
-        .gte('expense_date', startDay)
-        .lte('expense_date', endDay)
-        .not('card_id', 'is', null);
-
       const enhancedCards = cardsData.map(card => {
         const totalPending = pendingExp.filter(e => e.card_id === card.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
         
-        // Fatura do Ciclo Atual (Acumulado até o fechamento deste mês)
-        const today = new Date();
-        const refClosing = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
-        refClosing.setHours(23, 59, 59, 999);
-        const refClosingStr = refClosing.toISOString().split('T')[0];
+        // Fatura do Ciclo Atual (Data de Corte Baseada no Fechamento Unificado)
+        const cutOffStr = getCutOffDate(card.closing_day);
 
         const currentInvoice = pendingExp
-          .filter(e => e.card_id === card.id && e.expense_date <= refClosingStr)
+          .filter(e => e.card_id === card.id && e.expense_date <= cutOffStr)
           .reduce((acc, curr) => acc + Number(curr.amount), 0);
 
         const limit = Number(card.credit_limit || 0);
@@ -72,10 +55,6 @@ export default function Cards() {
       setCards(enhancedCards);
     } catch (error) {
       console.error("Erro ao carregar dados dos cartões:", error);
-      // Se o erro for de coluna ausente (42703), podemos ainda mostrar os cartões sem o cálculo de fatura
-      if (error.code === '42703') {
-        alert("Atenção: Algumas funcionalidades de fatura exigem atualização do banco de dados (coluna 'paga' ausente). Peça ao suporte para rodar as migrações.");
-      }
     } finally {
       setLoading(false);
     }
@@ -86,16 +65,14 @@ export default function Cards() {
     
     setIsSubmitting(true);
     try {
-      const today = new Date();
-      const closingDate = new Date(today.getFullYear(), today.getMonth(), card.closing_day);
-      closingDate.setHours(23, 59, 59, 999);
+      const cutOffStr = getCutOffDate(card.closing_day);
       
       const { error } = await supabase
         .from('expenses')
         .update({ paga: true, status: 'paid' })
         .eq('card_id', card.id)
         .eq('paga', false)
-        .lte('expense_date', closingDate.toISOString().split('T')[0]);
+        .lte('expense_date', cutOffStr);
 
       if (error) throw error;
       
@@ -208,35 +185,40 @@ export default function Cards() {
                </div>
 
                <div className="space-y-4 relative z-10">
-                 <div className="bg-background/50 p-4 rounded-xl border border-border/50 flex justify-between items-center">
-                    <span className="text-sm font-medium text-muted">Fatura Atual (Mês)</span>
-                    <span className="text-lg font-bold text-content">{formatCurrency(c.currentInvoice)}</span>
-                 </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-muted uppercase font-bold tracking-wider">Limite Comprometido (Total)</span>
+                    <h2 className="text-3xl font-bold text-content mt-1">{formatCurrency(c.totalPending)}</h2>
+                  </div>
 
-                 <div className="pt-2">
-                   <div className="flex justify-between text-xs mb-1.5 font-medium">
-                     <span className={c.consumedPct > 80 ? "text-red-400" : "text-muted"}>Limite Comprometido (Todas Faturas)</span>
-                     <span className="text-content">{c.consumedPct > 100 ? '>100' : c.consumedPct.toFixed(0)}%</span>
-                   </div>
-                   <div className="w-full bg-background rounded-full h-2.5 overflow-hidden">
-                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(c.consumedPct, 100)}%`, backgroundColor: c.consumedPct > 80 ? '#f87171' : c.color }}></div>
-                   </div>
-                   <div className="flex justify-between text-[11px] mt-1.5 font-medium">
-                     <span className="text-indigo-400">Disponível: {formatCurrency(c.available)}</span>
-                     <span className="text-muted">Total: {formatCurrency(c.credit_limit)}</span>
-                   </div>
-                 </div>
+                  <div className="bg-background/40 p-3 rounded-xl border border-border/50 flex justify-between items-center text-indigo-400">
+                    <span className="text-xs font-medium text-muted text-content">Fatura Fechada (Mês)</span>
+                    <span className="text-sm font-bold">{formatCurrency(c.currentInvoice)}</span>
+                  </div>
 
-                 {c.currentInvoice > 0 && (
-                   <button 
-                     onClick={() => handlePagarFatura(c)}
-                     disabled={isSubmitting}
-                     className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-xl text-[11px] font-bold transition-all shadow-sm group/btn"
-                   >
-                     {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} className="group-hover/btn:scale-110 transition-transform" />}
-                     PAGAR FATURA ATUAL
-                   </button>
-                 )}
+                  <div className="pt-2">
+                    <div className="flex justify-between text-xs mb-1.5 font-medium">
+                      <span className={c.consumedPct > 80 ? "text-red-400" : "text-muted"}>Consumo do Limite Global</span>
+                      <span className="text-content">{c.consumedPct > 100 ? '>100' : c.consumedPct.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-background rounded-full h-2.5 overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(c.consumedPct, 100)}%`, backgroundColor: c.consumedPct > 80 ? '#f87171' : c.color }}></div>
+                    </div>
+                    <div className="flex justify-between text-[11px] mt-1.5 font-medium">
+                      <span className="text-indigo-400">Disponível: {formatCurrency(c.available)}</span>
+                      <span className="text-muted">Total: {formatCurrency(c.credit_limit)}</span>
+                    </div>
+                  </div>
+
+                  {c.currentInvoice > 0 && (
+                    <button 
+                      onClick={() => handlePagarFatura(c)}
+                      disabled={isSubmitting}
+                      className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-xl text-[11px] font-bold transition-all shadow-sm group/btn"
+                    >
+                      {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Receipt size={14} className="group-hover/btn:scale-110 transition-transform" />}
+                      PAGAR FATURA ATUAL
+                    </button>
+                  )}
                </div>
                
                <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-white z-0 pointer-events-none transform translate-x-4 -translate-y-4">

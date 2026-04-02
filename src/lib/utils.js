@@ -10,7 +10,9 @@ export function cn(...inputs) {
  * Identifica o mês de referência da fatura com base no dia de fechamento.
  */
 export function identificarMesFatura(expenseDateStr, closingDay) {
+  if (!expenseDateStr || !closingDay) return "Indeterminado";
   const d = new Date(expenseDateStr + "T12:00:00");
+  if (isNaN(d.getTime())) return "Indeterminado";
   const day = d.getDate();
   const month = d.getMonth();
   const year = d.getFullYear();
@@ -21,6 +23,25 @@ export function identificarMesFatura(expenseDateStr, closingDay) {
   const invoiceDate = new Date(year, month + monthsToAdd, 1);
   
   return new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(invoiceDate);
+}
+
+/**
+ * Calcula a data de corte da fatura "fechada" mais recente.
+ * Garante que o pagamento não afete despesas posteriores ao fechamento.
+ */
+export function getCutOffDate(closingDay) {
+  if (!closingDay) return null;
+  const today = new Date();
+  
+  // Se hoje ainda não chegamos no fim do dia de fechamento deste mês,
+  // a fatura que está "fechada" e pronta para pagamento é a do mês anterior.
+  let refMonth = today.getMonth();
+  if (today.getDate() < closingDay) {
+    refMonth -= 1;
+  }
+  
+  const cutOff = new Date(today.getFullYear(), refMonth, closingDay, 23, 59, 59, 999);
+  return cutOff.toISOString().split('T')[0];
 }
 
 /**
