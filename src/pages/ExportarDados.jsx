@@ -60,13 +60,13 @@ export default function ExportarDados() {
   const handleExportCSV = async () => {
     setCsvLoading(true);
     try {
-      const { data: incomes } = await supabase.from('incomes').select('*, categories(name)').eq('grupo_id', activeGroupId);
+      const { data: incomes } = await supabase.from('incomes').select('*').eq('grupo_id', activeGroupId);
       const { data: expenses } = await supabase.from('expenses').select('*, categories(name)').eq('grupo_id', activeGroupId);
 
       let csv = 'Tipo;Data;Descrição;Categoria;Valor\n';
       incomes?.forEach(i => {
         const val = i.net_amount ?? (i.gross_amount - (i.discounts || 0));
-        csv += `Receita;${i.month};"${i.description}";${i.categories?.name || 'Geral'};${val.toString().replace('.', ',')}\n`;
+        csv += `Receita;${i.month};"${i.description}";${i.type || 'Salário'};${val.toString().replace('.', ',')}\n`;
       });
       expenses?.forEach(e => {
         csv += `Despesa;${e.expense_date};"${e.description}";${e.categories?.name || 'Geral'};${e.amount.toString().replace('.', ',')}\n`;
@@ -103,7 +103,7 @@ export default function ExportarDados() {
 
       const { data: incomes } = await supabase
         .from('incomes')
-        .select('description, gross_amount, discounts, net_amount, month, categories(name)')
+        .select('description, gross_amount, discounts, net_amount, month, type')
         .eq('grupo_id', activeGroupId)
         .gte('month', startDate)
         .lte('month', endDate + 'T23:59:59')
@@ -189,11 +189,11 @@ export default function ExportarDados() {
 
         autoTable(doc, {
           startY: y,
-          head: [['Mês', 'Descrição', 'Categoria', 'Valor Líquido']],
+          head: [['Mês', 'Descrição', 'Tipo', 'Valor Líquido']],
           body: incomes.map(i => [
             fmtDate(i.month),
             i.description,
-            i.categories?.name || 'Geral',
+            i.type || 'Salário',
             fmtBRL(i.net_amount ?? (i.gross_amount - (i.discounts || 0))),
           ]),
           styles: { fontSize: 8, cellPadding: 3, fillColor: [15, 23, 42], textColor: [244, 244, 245] },
