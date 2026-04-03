@@ -306,10 +306,18 @@ export default function Expenses() {
         {invoices.map(c => (
           <div key={c.id} className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[260px] flex-shrink-0 snap-start relative overflow-hidden">
             <div className="flex justify-between items-center mb-1 relative z-10">
-              <span className="text-muted font-medium text-sm flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div> Fatura: {monthName.split(' ')[0]}
-              </span>
-              <span className="text-[10px] text-muted font-medium">Vence dia {c.due_day}</span>
+              <div className="flex flex-col">
+                <span className="text-content font-bold text-sm flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></div> {c.name}
+                </span>
+                <span className="text-muted text-[10px] mt-0.5 ml-5 truncate max-w-[180px]">
+                  Titular: {c.profiles?.full_name?.split(' ')[0] || c.profiles?.email?.split('@')[0] || 'Membro'}
+                </span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-[11px] text-muted font-medium bg-background/50 px-2 py-0.5 rounded border border-border/50">Fatura: {monthName.split(' ')[0]}</span>
+                <span className="text-[10px] text-muted font-medium mt-1">Vence dia {c.due_day}</span>
+              </div>
             </div>
             <h2 className="text-2xl font-bold text-content mb-3 relative z-10">{formatCurrency(c.invoiceTotal)}</h2>
             <div className="relative z-10">
@@ -350,7 +358,9 @@ export default function Expenses() {
               <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
               <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
               {cards.map(c => (
-                <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all")}>{c.name}</button>
+                <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all flex items-center gap-1.5")}>
+                  {c.name} <span className="opacity-70 font-normal">({c.profiles?.full_name?.split(' ')[0] || c.profiles?.email?.split('@')[0] || 'Membro'})</span>
+                </button>
               ))}
             </div>
 
@@ -410,6 +420,7 @@ export default function Expenses() {
             <div className="space-y-3 md:space-y-4">
               {filteredList.map(exp => {
                 const card = exp.cards;
+                const fullCard = cards.find(c => c.id === card?.id);
                 const isPaid = exp.paga || exp.status === 'paid';
 
                 return (
@@ -430,7 +441,7 @@ export default function Expenses() {
                           {card ? (
                             <>
                               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border" style={{ backgroundColor: `${card.color}20`, color: card.color, borderColor: `${card.color}40` }}>
-                                💳 {card.name}
+                                💳 {card.name} {fullCard?.profiles ? `• ${fullCard.profiles.full_name?.split(' ')[0] || 'Membro'}` : ''}
                               </span>
                               <span className="text-[10px] bg-zinc-500/10 text-muted border border-border/50 px-1.5 py-0.5 rounded uppercase font-bold">
                                 Fatura: {identificarMesFatura(exp.expense_date, card.closing_day)}
