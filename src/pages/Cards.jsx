@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, Plus, Loader2, Trash2, X, Edit2, CheckCircle2, Receipt } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getCutOffDate } from '../lib/utils';
+import UserAvatar from '../components/common/UserAvatar';
 
 export default function Cards() {
   const { user, showBalances, activeGroupId } = useAuth();
@@ -13,7 +14,8 @@ export default function Cards() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCardId, setEditingCardId] = useState(null);
-  const [cardForm, setCardForm] = useState({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
+  const [cardForm, setCardForm] = useState({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '', user_id: '' });
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
 
   useEffect(() => {
     if (activeGroupId) {
@@ -24,8 +26,16 @@ export default function Cards() {
   const fetchCardsData = async () => {
     setLoading(true);
     try {
+      const { data: membersData } = await supabase.from('membros_grupo')
+        .select('user_id, profiles(full_name, email)')
+        .eq('grupo_id', activeGroupId);
+      if (membersData) setWorkspaceMembers(membersData);
+
       const { data: cardsData, error: errC } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
-      if (errC) throw errC;
+      if (errC) {
+        console.error("Supabase Error (Cards):", errC);
+        throw errC;
+      }
 
       const { data: pendingExp, error: errE } = await supabase
         .from('expenses')
@@ -33,7 +43,10 @@ export default function Cards() {
         .eq('grupo_id', activeGroupId)
         .eq('paga', false)
         .not('card_id', 'is', null);
-      if (errE) throw errE;
+      if (errE) {
+        console.error("Supabase Error (Expenses):", errE);
+        throw errE;
+      }
 
       const enhancedCards = cardsData.map(card => {
         const totalPending = pendingExp.filter(e => e.card_id === card.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
@@ -49,12 +62,17 @@ export default function Cards() {
         const available = Math.max(limit - totalPending, 0);
         const consumedPct = limit > 0 ? (totalPending / limit) * 100 : 0;
         
-        return { ...card, totalPending, currentInvoice, available, consumedPct };
+        // Map profile manually
+        const member = membersData?.find(m => m.user_id === card.user_id);
+        const cardProfile = member ? member.profiles : null;
+        
+        return { ...card, profiles: cardProfile, totalPending, currentInvoice, available, consumedPct };
       });
 
       setCards(enhancedCards);
     } catch (error) {
       console.error("Erro ao carregar dados dos cartões:", error);
+      alert("Erro ao carregar cartões: " + (error.message || JSON.stringify(error)));
     } finally {
       setLoading(false);
     }
@@ -100,14 +118,15 @@ export default function Cards() {
         color: cardForm.color,
         closing_day: parseInt(cardForm.closing_day),
         due_day: parseInt(cardForm.due_day),
-        credit_limit: parseFloat(cardForm.credit_limit || 0)
+        credit_limit: parseFloat(cardForm.credit_limit || 0),
+        user_id: cardForm.user_id || user.id
       };
 
       if (editingCardId) {
         const { error } = await supabase.from('cards').update(payload).eq('id', editingCardId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('cards').insert([{ user_id: user.id, grupo_id: activeGroupId, ...payload }]);
+        const { error } = await supabase.from('cards').insert([{ grupo_id: activeGroupId, ...payload }]);
         if (error) throw error;
       }
 
@@ -127,7 +146,8 @@ export default function Cards() {
       color: card.color,
       closing_day: card.closing_day,
       due_day: card.due_day,
-      credit_limit: card.credit_limit
+      credit_limit: card.credit_limit,
+      user_id: card.user_id || user.id
     });
     setShowModal(true);
   };
@@ -135,7 +155,7 @@ export default function Cards() {
   const closeModal = () => {
     setShowModal(false);
     setEditingCardId(null);
-    setCardForm({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
+    setCardForm({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '', user_id: '' });
   };
 
   const handleDelete = async (id) => {
@@ -171,12 +191,18 @@ export default function Cards() {
           {sortedCards.map(c => (
             <div key={c.id} className="bg-surface/60 border border-border rounded-2xl p-6 relative overflow-hidden group">
                <div className="flex justify-between items-start mb-6 relative z-10">
-                 <div className="flex flex-col">
+                 <div className="flex flex-col gap-1.5">
                    <div className="flex items-center gap-2">
                      <div className="w-3 h-3 rounded-full shadow-lg" style={{backgroundColor: c.color}}></div>
                      <h3 className="text-xl font-bold text-content">{c.name}</h3>
+                     {c.profiles && <UserAvatar nameOrEmail={c.profiles.full_name || c.profiles.email} size="sm" />}
                    </div>
-                   <p className="text-xs text-muted mt-1">Fecha dia {c.closing_day} • Vence dia {c.due_day}</p>
+                   {c.profiles && (
+                     <span className="text-[10px] text-muted bg-background/50 inline-block px-1.5 py-0.5 rounded border border-border/50 self-start">
+                       Titular: {c.profiles.full_name?.split(' ')[0] || c.profiles.email?.split('@')[0] || 'Membro'}
+                     </span>
+                   )}
+                   <p className="text-xs text-muted mb-1">Fecha dia {c.closing_day} • Vence dia {c.due_day}</p>
                  </div>
                  <div className="flex items-center gap-1 bg-background/50 rounded-lg p-1 border border-border/50">
                    <button onClick={() => handleEdit(c)} className="text-muted hover:text-indigo-400 transition-colors p-1.5 rounded-md hover:bg-border"><Edit2 size={16}/></button>
@@ -239,6 +265,14 @@ export default function Cards() {
              
              <form onSubmit={handleCardSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                   <div className="col-span-2 space-y-1">
+                     <label className="text-xs text-muted">Titular do Cartão</label>
+                     <select value={cardForm.user_id || user?.id || ''} onChange={e=>setCardForm({...cardForm, user_id: e.target.value})} className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 focus:ring-indigo-500 appearance-none">
+                       {workspaceMembers.map(m => (
+                         <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || m.profiles?.email}</option>
+                       ))}
+                     </select>
+                   </div>
                    <div className="col-span-2 space-y-1">
                      <label className="text-xs text-muted">Nome do Cartão (Instituição)</label>
                      <input type="text" placeholder="Ex: Nubank, Itaú..." value={cardForm.name} onChange={e=>setCardForm({...cardForm, name: e.target.value})} required className="w-full bg-background/50 border border-border rounded-lg px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-1 focus:ring-indigo-500" />

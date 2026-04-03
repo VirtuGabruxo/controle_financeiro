@@ -48,7 +48,7 @@ export default function Expenses() {
     if (!activeGroupId) return;
     const { data: catData } = await supabase.from('categories').select('*').or(`grupo_id.eq.${activeGroupId},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
-    const { data: cardData } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
+    const { data: cardData } = await supabase.from('cards').select('*, profiles(full_name, email)').eq('grupo_id', activeGroupId).order('name');
     if (cardData) setCards(cardData);
   };
 
@@ -220,7 +220,13 @@ export default function Expenses() {
     
     setDangerLoading(true);
     try {
-      const cutOffStr = getCutOffDate(card.closing_day);
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth(); // Mês atual focado: 0=Jan, 1=Fev etc.
+      
+      // O fechamento dessa fatura ocorreu no mês anterior (month - 1) no dia (closing_day - 1)
+      const cutOff = new Date(year, month - 1, card.closing_day - 1, 23, 59, 59);
+      const cutOffStr = cutOff.toISOString().split('T')[0];
+
       const { error } = await supabase
         .from('expenses')
         .update({ paga: true, status: 'paid' })
@@ -231,6 +237,12 @@ export default function Expenses() {
       if (error) throw error;
       
       alert('Fatura paga com sucesso!');
+      
+      // Atualização imediata em memória (recalculando limite global)
+      setUnpaidExpensesGlobal(prev => prev.filter(e => !(e.card_id === card.id && e.expense_date <= cutOffStr)));
+      setExpenses(prev => prev.map(e => (e.card_id === card.id && e.expense_date <= cutOffStr && !e.paga) ? { ...e, paga: true, status: 'paid' } : e));
+      
+      // Busca assincronamente os dados para garantir sincronia real
       fetchExpenses();
       fetchCoreData();
     } catch (error) {
@@ -600,7 +612,7 @@ const ExpenseForm = ({
         </div>
         <select disabled={expenseType === 'loan'} value={expenseType === 'loan' ? 'debit' : cardId} onChange={e => setCardId(e.target.value)} required className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm appearance-none disabled:opacity-60">
           <option value="debit">Débito / Dinheiro / Pix</option>
-          {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name}</option>)}
+          {cards.map(c => <option key={c.id} value={c.id}>💳 {c.name} ({c.profiles?.full_name?.split(' ')[0] || c.profiles?.email?.split('@')[0] || 'Membro'})</option>)}
         </select>
       </div>
 
