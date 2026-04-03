@@ -151,7 +151,7 @@ export default function Expenses() {
     e.preventDefault();
     setIsSubmittingCard(true);
     try {
-      const { error } = await supabase.from('cards').insert([{ user_id: user.id, name: cardForm.name, color: cardForm.color, closing_day: parseInt(cardForm.closing_day), due_day: parseInt(cardForm.due_day), credit_limit: parseFloat(cardForm.credit_limit || 0) }]);
+      const { error } = await supabase.from('cards').insert([{ grupo_id: activeGroupId, user_id: user.id, name: cardForm.name, color: cardForm.color, closing_day: parseInt(cardForm.closing_day), due_day: parseInt(cardForm.due_day), credit_limit: parseFloat(cardForm.credit_limit || 0) }]);
       if (error) throw error;
       setShowCardModal(false);
       setCardForm({ name: '', color: '#6366f1', closing_day: 15, due_day: 20, credit_limit: '' });
