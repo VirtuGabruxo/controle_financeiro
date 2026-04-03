@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
+  const [pendingExpense, setPendingExpense] = useState(0);
   const [expensesByCategory, setExpensesByCategory] = useState([]);
   const [evolutionData, setEvolutionData] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -178,12 +179,38 @@ export default function Dashboard() {
       const sumIncome = incomes?.reduce((acc, curr) => acc + (curr.net_amount !== undefined ? Number(curr.net_amount) : Number(curr.gross_amount) - Number(curr.discounts || 0)), 0) || 0;
       setTotalIncome(sumIncome);
 
-      const { data: expenses } = await supabase.from('expenses').select('amount, categories(name, color)').gte('expense_date', firstDay).lte('expense_date', lastDay).eq('grupo_id', activeGroupId);
-      const sumExpense = expenses?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
-      setTotalExpense(sumExpense);
+      const dStart = new Date(year, month - 2, 1);
+      const startDay = `${dStart.getFullYear()}-${String(dStart.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
 
-      if (expenses) {
-        const grouped = expenses.reduce((acc, current) => {
+      const { data: rawExpenses } = await supabase.from('expenses')
+        .select('amount, expense_date, card_id, paga, categories(name, color), cards(closing_day)')
+        .gte('expense_date', startDay)
+        .lte('expense_date', lastDay)
+        .eq('grupo_id', activeGroupId);
+
+      const expensesCaixa = (rawExpenses || []).filter(exp => {
+        const d = new Date(exp.expense_date + "T12:00:00");
+        const expMonth = d.getMonth();
+        const expYear = d.getFullYear();
+
+        if (!exp.card_id || !exp.cards?.closing_day) {
+          return expMonth === month && expYear === year;
+        } else {
+          const day = d.getDate();
+          const monthsToAdd = day >= exp.cards.closing_day ? 2 : 1;
+          const invoiceDate = new Date(expYear, expMonth + monthsToAdd, 1);
+          return invoiceDate.getMonth() === month && invoiceDate.getFullYear() === year;
+        }
+      });
+
+      const sumExpense = expensesCaixa.reduce((acc, curr) => acc + Number(curr.amount), 0);
+      const sumPending = expensesCaixa.filter(e => !e.paga).reduce((acc, curr) => acc + Number(curr.amount), 0);
+      
+      setTotalExpense(sumExpense);
+      setPendingExpense(sumPending);
+
+      if (expensesCaixa.length > 0) {
+        const grouped = expensesCaixa.reduce((acc, current) => {
           const catName = current.categories?.name || 'Geral';
           const color = current.categories?.color || '#a1a1aa';
           if (!acc[catName]) acc[catName] = { name: catName, value: 0, color };
@@ -191,13 +218,19 @@ export default function Dashboard() {
           return acc;
         }, {});
         setExpensesByCategory(Object.values(grouped).sort((a, b) => b.value - a.value));
+      } else {
+        setExpensesByCategory([]);
       }
 
-      const d6 = new Date(year, month - 5, 1);
-      const sixMonthsAgo = `${d6.getFullYear()}-${String(d6.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
-      const { data: evolExpenses } = await supabase.from('expenses').select('amount, expense_date').gte('expense_date', sixMonthsAgo).lte('expense_date', lastDay).eq('grupo_id', activeGroupId);
+      const d8 = new Date(year, month - 7, 1);
+      const eightMonthsAgo = `${d8.getFullYear()}-${String(d8.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
+      const { data: evolExpensesRaw } = await supabase.from('expenses')
+        .select('amount, expense_date, card_id, cards(closing_day)')
+        .gte('expense_date', eightMonthsAgo)
+        .lte('expense_date', lastDay)
+        .eq('grupo_id', activeGroupId);
         
-      if (evolExpenses) {
+      if (evolExpensesRaw) {
         const monthlyTotals = {};
         for (let i = 5; i >= 0; i--) {
           const d = new Date(year, month - i, 1);
@@ -205,9 +238,21 @@ export default function Dashboard() {
           const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(d);
           monthlyTotals[monthKey] = { name: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1).replace('.', ''), total: 0 };
         }
-        evolExpenses.forEach(exp => {
-          const mKey = exp.expense_date.substring(0, 7);
-          if (monthlyTotals[mKey]) monthlyTotals[mKey].total += Number(exp.amount);
+        
+        evolExpensesRaw.forEach(exp => {
+          const d = new Date(exp.expense_date + "T12:00:00");
+          let invoiceDate = d;
+          
+          if (exp.card_id && exp.cards?.closing_day) {
+             const day = d.getDate();
+             const monthsToAdd = day >= exp.cards.closing_day ? 2 : 1;
+             invoiceDate = new Date(d.getFullYear(), d.getMonth() + monthsToAdd, 1);
+          }
+          
+          const mKey = `${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(2, '0')}`;
+          if (monthlyTotals[mKey]) {
+            monthlyTotals[mKey].total += Number(exp.amount);
+          }
         });
         setEvolutionData(Object.values(monthlyTotals));
       }
@@ -223,7 +268,10 @@ export default function Dashboard() {
   const goPrevMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const goNextMonth = () => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
 
-  const balance = totalIncome - totalExpense;
+  const paidExpense = totalExpense - pendingExpense;
+  const balance = totalIncome - paidExpense;
+  const saldoProjetado = balance - pendingExpense;
+
   const formatCurrency = (val) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val) : 'R$ ****';
   const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentMonth);
 
@@ -290,10 +338,13 @@ export default function Dashboard() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-border transition-all">
+        <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-border transition-all flex flex-col justify-center">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={80} /></div>
           <p className="text-muted font-medium mb-1 relative z-10 text-sm md:text-base">Saldo Líquido</p>
           <h2 className={`text-2xl md:text-3xl lg:text-4xl font-bold relative z-10 ${balance >= 0 ? 'text-primary-glow' : 'text-red-400'}`}>{formatCurrency(balance)}</h2>
+          <p className={`text-xs md:text-sm mt-1.5 md:mt-2 relative z-10 font-medium ${saldoProjetado >= 0 ? 'text-muted' : 'text-red-400'}`}>
+            Previsão após contas: {formatCurrency(saldoProjetado)}
+          </p>
         </div>
         <div className="bg-surface/60 border border-border rounded-2xl p-5 md:p-6 relative overflow-hidden group hover:border-border transition-all">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={80} /></div>
