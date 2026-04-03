@@ -48,8 +48,17 @@ export default function Expenses() {
     if (!activeGroupId) return;
     const { data: catData } = await supabase.from('categories').select('*').or(`grupo_id.eq.${activeGroupId},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
-    const { data: cardData } = await supabase.from('cards').select('*, profiles(full_name, email)').eq('grupo_id', activeGroupId).order('name');
-    if (cardData) setCards(cardData);
+    
+    const { data: membersData } = await supabase.from('membros_grupo').select('user_id, profiles(full_name, email)').eq('grupo_id', activeGroupId);
+    const { data: cardData } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
+    
+    if (cardData) {
+      const enhancedCards = cardData.map(c => {
+        const m = membersData?.find(x => x.user_id === c.user_id);
+        return { ...c, profiles: m ? m.profiles : null };
+      });
+      setCards(enhancedCards);
+    }
   };
 
   const fetchExpenses = async () => {

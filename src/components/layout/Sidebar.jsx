@@ -31,7 +31,7 @@ export default function Sidebar() {
 
       <GroupSelector />
       
-      <nav className="flex-1 px-4 space-y-2 mt-4">
+      <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.path);

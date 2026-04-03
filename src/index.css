@@ -66,3 +66,28 @@
 body {
   @apply bg-background text-content transition-colors duration-300;
 }
+
+/* Utilitários Globais de Scrollbar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-line);
+  border-radius: 4px;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-line) transparent;
+}
