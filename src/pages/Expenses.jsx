@@ -44,6 +44,8 @@ export default function Expenses() {
   const [cardId, setCardId] = useState('debit');
   const [installments, setInstallments] = useState('1');
   const [expenseType, setExpenseType] = useState('common'); // 'common', 'loan'
+  const [paidInstallments, setPaidInstallments] = useState('0');
+  const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Card Manager Modal State
   const [showCardModal, setShowCardModal] = useState(false);
@@ -136,18 +138,22 @@ export default function Expenses() {
       } else {
         const qty = isRecurring ? 24 : parseInt(installments || '1');
         const baseAmount = (isRecurring || isLoan) ? parseFloat(amount) : (parseFloat(amount) / qty);
-        // Note: For loans, 'amount' is usually the installment parcel value directly. 
-        // If they enter 10 parcels of 500, we make 10 entries of 500.
+        
+        const refFirstDate = (qty > 1 && !isRecurring) ? firstInstallmentDate : expenseDate;
+        const paidCount = (qty > 1 && !isRecurring) ? parseInt(paidInstallments || '0') : 0;
 
         const payloads = [];
-        let d = new Date(`${expenseDate}T12:00:00`);
+        let d = new Date(`${refFirstDate}T12:00:00`);
 
         for (let i = 0; i < qty; i++) {
+          const isPaid = i < paidCount;
           payloads.push({
             ...payloadBase,
             description: qty > 1 && !isRecurring ? `${description} (${i + 1}/${qty})` : description,
             amount: baseAmount,
             expense_date: d.toISOString().split('T')[0],
+            paga: isPaid,
+            status: isPaid ? 'paid' : 'pending'
           });
           d.setMonth(d.getMonth() + 1);
         }
@@ -215,6 +221,8 @@ export default function Expenses() {
     setAmount('');
     setInstallments('1');
     setExpenseType('common');
+    setPaidInstallments('0');
+    setFirstInstallmentDate(new Date().toISOString().split('T')[0]);
     setShowExpenseModal(false);
   };
 
@@ -292,7 +300,7 @@ export default function Expenses() {
   const formProps = {
     editingId, description, setDescription, amount, setAmount, expenseDate, setExpenseDate,
     categoryId, setCategoryId, cardId, setCardId, installments, setInstallments,
-    expenseType, setExpenseType, cards, categories, isSubmitting, handleSubmit,
+    expenseType, setExpenseType, paidInstallments, setPaidInstallments, firstInstallmentDate, setFirstInstallmentDate, cards, categories, isSubmitting, handleSubmit,
     handleCancelEdit, setShowCardModal
   };
 
@@ -588,7 +596,7 @@ const ExpenseForm = ({
   embedded = true,
   editingId, description, setDescription, amount, setAmount, expenseDate, setExpenseDate,
   categoryId, setCategoryId, cardId, setCardId, installments, setInstallments,
-  expenseType, setExpenseType, cards, categories, isSubmitting, handleSubmit,
+  expenseType, setExpenseType, paidInstallments, setPaidInstallments, firstInstallmentDate, setFirstInstallmentDate, cards, categories, isSubmitting, handleSubmit,
   handleCancelEdit, setShowCardModal
 }) => (
   <div className={cn(
@@ -632,9 +640,25 @@ const ExpenseForm = ({
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-muted">Nº Parcelas</label>
-          <input type="number" min="1" max="120" disabled={editingId} value={installments} onChange={e => setInstallments(e.target.value)} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
+          <input type="number" min="1" max="120" disabled={editingId} value={installments} onChange={e => {
+            setInstallments(e.target.value);
+            if (parseInt(e.target.value || '1') <= parseInt(paidInstallments || '0')) setPaidInstallments('0');
+          }} className="w-full bg-background/50 border border-border rounded-xl px-3 py-2.5 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm disabled:opacity-50" />
         </div>
       </div>
+
+      {parseInt(installments || '1') > 1 && !editingId && expenseType === 'common' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-background/30 p-4 rounded-xl border border-border mt-2">
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-semibold text-muted tracking-wide uppercase">Parcelas já pagas (Retroativas)</label>
+             <input type="number" min="0" max={parseInt(installments || '1') - 1} value={paidInstallments} onChange={e => setPaidInstallments(e.target.value)} className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-semibold text-muted tracking-wide uppercase">Mês/Ano Pagamento da 1ª Parcela</label>
+             <input type="date" value={firstInstallmentDate} onChange={e => setFirstInstallmentDate(e.target.value)} className="w-full bg-surface border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
