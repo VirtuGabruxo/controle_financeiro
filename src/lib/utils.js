@@ -40,8 +40,14 @@ export function getCutOffDate(closingDay) {
     refMonth -= 1;
   }
   
-  const cutOff = new Date(today.getFullYear(), refMonth, closingDay, 23, 59, 59, 999);
-  return cutOff.toISOString().split('T')[0];
+  // O ciclo finaliza no *instante antes* do dia de fechamento. 
+  // Gastos NO dia de fechamento (ex: dia 21) caem na próxima fatura.
+  const cutOff = new Date(today.getFullYear(), refMonth, closingDay - 1);
+  const yy = cutOff.getFullYear();
+  const mm = String(cutOff.getMonth() + 1).padStart(2, '0');
+  const dd = String(cutOff.getDate()).padStart(2, '0');
+  
+  return `${yy}-${mm}-${dd}`;
 }
 
 /**
