@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark, Receipt } from 'lucide-react';
@@ -8,7 +8,16 @@ import { registrarLogAtividade } from '../lib/activityLogger';
 
 export default function Expenses() {
   const { user, showBalances, activeGroupId } = useAuth();
+  
+  const faturasRef = useRef(null);
+  const filtrosRef = useRef(null);
 
+  const handleScrollHorizontal = (e, ref) => {
+    if (ref.current) {
+      e.preventDefault();
+      ref.current.scrollLeft += e.deltaY;
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [dangerLoading, setDangerLoading] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -296,8 +305,15 @@ export default function Expenses() {
         </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 snap-x scrollbar-none touch-pan-x">
-        <div className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
+      <div className="relative group w-full min-w-0">
+        <button type="button" onClick={() => faturasRef.current?.scrollBy({ left: -300, behavior: 'smooth' })} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 w-8 h-8 items-center justify-center bg-surface border border-border shadow-lg rounded-full text-muted hover:text-content opacity-0 group-hover:opacity-100 transition-opacity">
+          <ChevronLeft size={18} />
+        </button>
+        <button type="button" onClick={() => faturasRef.current?.scrollBy({ left: 300, behavior: 'smooth' })} className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 w-8 h-8 items-center justify-center bg-surface border border-border shadow-lg rounded-full text-muted hover:text-content opacity-0 group-hover:opacity-100 transition-opacity">
+          <ChevronRight size={18} />
+        </button>
+        <div ref={faturasRef} onWheel={(e) => handleScrollHorizontal(e, faturasRef)} className="flex gap-4 overflow-x-auto pb-4 snap-x custom-scrollbar touch-pan-x">
+          <div className="bg-surface/60 border border-border p-4 rounded-2xl min-w-[240px] flex-shrink-0 snap-start">
           <div className="flex justify-between items-center mb-2">
             <span className="text-muted text-sm flex items-center gap-2"><Wallet size={16} /> Débito / Pix</span>
           </div>
@@ -342,6 +358,7 @@ export default function Expenses() {
             )}
           </div>
         ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -353,18 +370,26 @@ export default function Expenses() {
 
         {/* Histórico/Lista */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x w-full md:w-auto touch-pan-x">
-              <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
-              <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
-              {cards.map(c => (
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full min-w-0">
+            <div className="relative group w-full md:flex-1 min-w-0">
+              <button type="button" onClick={() => filtrosRef.current?.scrollBy({ left: -200, behavior: 'smooth' })} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 items-center justify-center bg-surface/80 backdrop-blur border border-border shadow rounded-full text-muted hover:text-content opacity-0 group-hover:opacity-100 transition-opacity">
+                <ChevronLeft size={14} />
+              </button>
+              <button type="button" onClick={() => filtrosRef.current?.scrollBy({ left: 200, behavior: 'smooth' })} className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 items-center justify-center bg-surface/80 backdrop-blur border border-border shadow rounded-full text-muted hover:text-content opacity-0 group-hover:opacity-100 transition-opacity">
+                <ChevronRight size={14} />
+              </button>
+              <div ref={filtrosRef} onWheel={(e) => handleScrollHorizontal(e, filtrosRef)} className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar snap-x w-full md:w-auto touch-pan-x">
+                <button onClick={() => setActiveTab('all')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'all' ? "bg-surface text-content border-border/80" : "bg-transparent text-muted hover:bg-border")}>Todas</button>
+                <button onClick={() => setActiveTab('debit')} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start transition-all border border-border", activeTab === 'debit' ? "bg-primary/20 text-primary-glow border-primary/50" : "bg-transparent text-muted hover:bg-border")}>Débito/Dinheiro</button>
+                {cards.map(c => (
                 <button key={c.id} onClick={() => setActiveTab(c.id)} style={{ borderColor: activeTab === c.id ? c.color : 'var(--border)', color: activeTab === c.id ? c.color : 'var(--muted)' }} className={cn("px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap snap-start border bg-transparent hover:bg-border transition-all flex items-center gap-1.5")}>
                   {c.name} <span className="opacity-70 font-normal">({c.profiles?.full_name?.split(' ')[0] || c.profiles?.email?.split('@')[0] || 'Membro'})</span>
                 </button>
               ))}
+              </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2 bg-surface/80 border border-border p-1.5 rounded-xl w-full md:w-auto">
+            <div className="flex items-center justify-between gap-2 bg-surface/80 border border-border p-1.5 rounded-xl w-full md:w-auto flex-shrink-0">
               <button onClick={goPrevMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronLeft size={18} /></button>
               <span className="min-w-[130px] text-center font-bold capitalize text-content text-xs md:text-sm">{monthName}</span>
               <button onClick={goNextMonth} className="p-1.5 hover:bg-border rounded-lg text-muted transition-colors"><ChevronRight size={18} /></button>
