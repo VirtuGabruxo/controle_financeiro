@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, DollarSign, CreditCard, Settings as SettingsIcon, Target, PieChart, LineChart, FileDown, Users } from 'lucide-react';
+import { Home, DollarSign, CreditCard, Settings as SettingsIcon, Target, PieChart, LineChart, FileDown, Users, LogOut } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function BottomNav() {
   const location = useLocation();
-  const { activeGroupId, userGroups } = useAuth();
+  const { activeGroupId, userGroups, signOut } = useAuth();
   
   const activeGroup = userGroups.find(g => g.id === activeGroupId);
   
@@ -59,6 +59,13 @@ export default function BottomNav() {
             </Link>
           );
         })}
+        <button
+          onClick={() => signOut()}
+          className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all w-16 h-14 snap-start flex-shrink-0 text-rose-400 opacity-80 hover:opacity-100"
+        >
+          <LogOut size={20} />
+          <span className="text-[10px] font-medium">Sair</span>
+        </button>
       </div>
     </nav>
   );
