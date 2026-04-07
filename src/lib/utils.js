@@ -6,22 +6,50 @@ export function cn(...inputs) {
 }
 
 /**
- * MOTOR DE DATA BANCÁRIO (SENIOR)
- * Identifica o mês de referência da fatura com base no dia de fechamento.
+ * MOTOR DE DATA BANCÁRIO v2 (SENIOR)
+ * Identifica o mês de referência da fatura usando algoritmo de 2 passos:
+ *   Passo A: Define o mês de fechamento base (compra entrou neste ciclo ou no próximo?)
+ *   Passo B: Ajusta para o mês real de vencimento (vencimento no mesmo mês ou no seguinte?)
+ *
+ * @param {string} expenseDateStr - Data da despesa (YYYY-MM-DD)
+ * @param {number} closingDay     - Dia de fechamento do cartão
+ * @param {number} [dueDay]       - Dia de vencimento do cartão (opcional, fallback p/ comportamento legado)
  */
-export function identificarMesFatura(expenseDateStr, closingDay) {
+export function identificarMesFatura(expenseDateStr, closingDay, dueDay) {
   if (!expenseDateStr || !closingDay) return "Indeterminado";
   const d = new Date(expenseDateStr + "T12:00:00");
   if (isNaN(d.getTime())) return "Indeterminado";
-  const day = d.getDate();
-  const month = d.getMonth();
-  const year = d.getFullYear();
 
-  // Se o dia da compra >= dia de fechamento, vai para a fatura de M+2
-  // Caso contrário, vai para a fatura de M+1
-  const monthsToAdd = day >= closingDay ? 2 : 1;
-  const invoiceDate = new Date(year, month + monthsToAdd, 1);
-  
+  const day = d.getDate();
+  let month = d.getMonth();   // 0-indexed (Jan=0)
+  let year = d.getFullYear();
+
+  // ── PASSO A: Mês de Fechamento Base ──
+  // Se a compra foi feita no dia do fechamento ou depois, ela "perdeu" o ciclo
+  // atual e entra na fatura que fecha no mês seguinte.
+  if (day >= closingDay) {
+    month += 1;
+    if (month > 11) { month = 0; year += 1; }
+  }
+  // Aqui, (year, month) = mês em que ocorre o FECHAMENTO desta fatura.
+
+  // ── PASSO B: Mês de Vencimento (Fatura Real) ──
+  // Compara dia_vencimento com dia_fechamento para saber se o vencimento
+  // ocorre no mesmo mês do fechamento ou no mês seguinte.
+  if (dueDay != null) {
+    if (dueDay < closingDay) {
+      // Ex: Fecha 26, Vence 02 → o vencimento pula para o mês seguinte
+      month += 1;
+      if (month > 11) { month = 0; year += 1; }
+    }
+    // Se dueDay >= closingDay (Ex: Fecha 21, Vence 28) → mesmo mês, nada a fazer
+  } else {
+    // Fallback legado (sem dueDay): assume vencimento no mês seguinte ao fechamento
+    month += 1;
+    if (month > 11) { month = 0; year += 1; }
+  }
+
+  const invoiceDate = new Date(year, month, 1);
   return new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(invoiceDate);
 }
 

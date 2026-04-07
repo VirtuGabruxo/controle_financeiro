@@ -308,7 +308,7 @@ export default function Expenses() {
     const mesVisivel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(currentMonth);
     const invoiceTotal = (filteredUnpaid || []).filter(e => {
       if (e.card_id !== c.id) return false;
-      const mesFatura = identificarMesFatura(e.expense_date, c.closing_day);
+      const mesFatura = identificarMesFatura(e.expense_date, c.closing_day, c.due_day);
       return mesFatura.toLowerCase() === mesVisivel.toLowerCase();
     }).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
@@ -487,7 +487,7 @@ export default function Expenses() {
               const totalCycle = (filteredUnpaid || []).filter(e => {
                 if (e.card_id !== selectedCard.id) return false;
                 if (!e.expense_date || !selectedCard.closing_day) return false;
-                const mesFatura = identificarMesFatura(e.expense_date, selectedCard.closing_day);
+                const mesFatura = identificarMesFatura(e.expense_date, selectedCard.closing_day, selectedCard.due_day);
                 return mesFatura && mesVisivel && mesFatura.toLowerCase() === mesVisivel.toLowerCase();
               }).reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
@@ -548,7 +548,7 @@ export default function Expenses() {
                                 💳 {card.name} {fullCard?.profiles ? `• ${fullCard.profiles.full_name?.split(' ')[0] || 'Membro'}` : ''}
                               </span>
                               <span className="text-[10px] bg-zinc-500/10 text-muted border border-border/50 px-1.5 py-0.5 rounded uppercase font-bold">
-                                Fatura: {identificarMesFatura(exp.expense_date, card.closing_day)}
+                                Fatura: {identificarMesFatura(exp.expense_date, card.closing_day, card.due_day)}
                               </span>
                             </>
                           ) : (
