@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Clock,
   RefreshCcw,
-  Ban
+  Ban,
+  Loader2,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -90,6 +92,8 @@ export default function GerenciarAssinaturas() {
     };
 
     try {
+      console.log("[ASSINATURAS] Payload enviado:", JSON.stringify(payload, null, 2));
+
       if (editingId) {
         const { error } = await supabase.from('assinaturas').update(payload).eq('id', editingId);
         if (error) throw error;
@@ -102,8 +106,8 @@ export default function GerenciarAssinaturas() {
       resetForm();
       fetchData();
     } catch (error) {
-      alert("Erro ao salvar assinatura.");
-      console.error(error);
+      console.error("[ASSINATURAS] Erro detalhado do Supabase:", error);
+      alert("Erro do banco: " + (error?.message || JSON.stringify(error)));
     } finally {
       setIsSubmitting(false);
     }
@@ -140,8 +144,8 @@ export default function GerenciarAssinaturas() {
 
       fetchData();
     } catch (error) {
-      alert("Erro ao alterar status da assinatura.");
-      console.error(error);
+      console.error("[ASSINATURAS] Erro ao alterar status:", error);
+      alert("Erro ao alterar status: " + (error?.message || JSON.stringify(error)));
     }
   };
 

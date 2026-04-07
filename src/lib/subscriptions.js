@@ -51,6 +51,7 @@ export async function processarAssinaturasAtivas(activeGroupId) {
         const { error: insertError } = await supabase
           .from('expenses')
           .insert({
+            user_id: sub.user_id, // Quem criou a assinatura
             grupo_id: activeGroupId,
             assinatura_id: sub.id,
             description: sub.nome, // Nome da assinatura
