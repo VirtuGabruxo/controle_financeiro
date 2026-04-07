@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark, Receipt } from 'lucide-react';
+import { Plus, CreditCard, Loader2, Trash2, Edit2, ChevronLeft, ChevronRight, CheckCircle2, Circle, Settings2, X, Wallet, FileText, Repeat, Landmark, Receipt, Users } from 'lucide-react';
 import { cn, identificarMesFatura, getCutOffDate } from '../lib/utils';
 import UserAvatar from '../components/common/UserAvatar';
 import { registrarLogAtividade } from '../lib/activityLogger';
@@ -25,6 +25,8 @@ export default function Expenses() {
   const [categories, setCategories] = useState([]);
   const [cards, setCards] = useState([]);
   const [unpaidExpensesGlobal, setUnpaidExpensesGlobal] = useState([]);
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [filtroMembroId, setFiltroMembroId] = useState(null);
 
   const getLocalDate = () => {
     const d = new Date();
@@ -60,7 +62,17 @@ export default function Expenses() {
     const { data: catData } = await supabase.from('categories').select('*').or(`grupo_id.eq.${activeGroupId},user_id.is.null`).order('name');
     if (catData) setCategories(catData);
     
-    const { data: membersData } = await supabase.from('membros_grupo').select('user_id, profiles(full_name, email)').eq('grupo_id', activeGroupId);
+    const { data: membersData } = await supabase.from('membros_grupo').select('user_id, profiles(full_name, avatar_url, email)').eq('grupo_id', activeGroupId);
+    
+    if (membersData) {
+      setGroupMembers(membersData.map(m => ({
+        user_id: m.user_id,
+        name: m.profiles?.full_name || m.profiles?.email || 'Membro',
+        email: m.profiles?.email,
+        avatar_url: m.profiles?.avatar_url
+      })));
+    }
+
     const { data: cardData } = await supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name');
     
     if (cardData) {
@@ -281,21 +293,30 @@ export default function Expenses() {
   const formatCurrency = (val) => showBalances ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val) : 'R$ ****';
   const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentMonth);
 
-  const filteredList = expenses.filter(e => activeTab === 'all' || (activeTab === 'debit' && !e.card_id) || e.card_id === activeTab);
+  // Filtro combinado: tab de cartão + filtro de membro
+  const filteredList = expenses.filter(e => {
+    const tabMatch = activeTab === 'all' || (activeTab === 'debit' && !e.card_id) || e.card_id === activeTab;
+    const membroMatch = !filtroMembroId || e.user_id === filtroMembroId;
+    return tabMatch && membroMatch;
+  });
+
+  // Faturas baseadas no filtro de membro
+  const filteredUnpaid = filtroMembroId ? unpaidExpensesGlobal.filter(e => e.user_id === filtroMembroId) : unpaidExpensesGlobal;
+  const filteredExpenses = filtroMembroId ? expenses.filter(e => e.user_id === filtroMembroId) : expenses;
 
   const invoices = cards.map(c => {
     const mesVisivel = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(currentMonth);
-    const invoiceTotal = (unpaidExpensesGlobal || []).filter(e => {
+    const invoiceTotal = (filteredUnpaid || []).filter(e => {
       if (e.card_id !== c.id) return false;
       const mesFatura = identificarMesFatura(e.expense_date, c.closing_day);
       return mesFatura.toLowerCase() === mesVisivel.toLowerCase();
     }).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-    const totalCommitted = unpaidExpensesGlobal.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const totalCommitted = filteredUnpaid.filter(e => e.card_id === c.id).reduce((acc, curr) => acc + Number(curr.amount), 0);
     const pct = c.credit_limit > 0 ? Math.min((totalCommitted / c.credit_limit) * 100, 100) : 0;
     return { ...c, invoiceTotal, totalCommitted, pct };
   });
-  const debitTotal = expenses.filter(e => !e.card_id).reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const debitTotal = filteredExpenses.filter(e => !e.card_id).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   const formProps = {
     editingId, description, setDescription, amount, setAmount, expenseDate, setExpenseDate,
@@ -404,6 +425,56 @@ export default function Expenses() {
             </div>
           </div>
 
+          {/* ── FILTRO POR MEMBRO (Avatar Toggle) ── */}
+          {groupMembers.length > 1 && (
+            <div className="flex items-center gap-3 py-2 px-1">
+              <span className="text-[10px] font-bold text-muted uppercase tracking-widest whitespace-nowrap hidden sm:inline">Membro:</span>
+              <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+                {/* Botão Todos */}
+                <button
+                  onClick={() => setFiltroMembroId(null)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap",
+                    !filtroMembroId
+                      ? "bg-primary/15 text-primary border-primary/40 shadow-sm shadow-primary/10"
+                      : "bg-transparent text-muted border-border/50 hover:border-border hover:text-content opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <Users size={14} />
+                  Todos
+                </button>
+
+                <div className="w-px h-6 bg-border/50 mx-1 flex-shrink-0" />
+
+                {/* Avatares dos membros */}
+                {groupMembers.map(member => {
+                  const isSelected = filtroMembroId === member.user_id;
+                  const hasFilter = filtroMembroId !== null;
+                  return (
+                    <button
+                      key={member.user_id}
+                      onClick={() => setFiltroMembroId(isSelected ? null : member.user_id)}
+                      title={member.name}
+                      className={cn(
+                        "relative flex-shrink-0 rounded-full transition-all duration-200 cursor-pointer",
+                        isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-[var(--background)] scale-110",
+                        hasFilter && !isSelected && "opacity-40 grayscale hover:opacity-70 hover:grayscale-0",
+                        !hasFilter && "hover:scale-110 hover:ring-2 hover:ring-border hover:ring-offset-1 hover:ring-offset-[var(--background)]"
+                      )}
+                    >
+                      <UserAvatar nameOrEmail={member.name || member.email} size="md" />
+                    </button>
+                  );
+                })}
+              </div>
+              {filtroMembroId && (
+                <span className="text-[10px] text-primary font-semibold whitespace-nowrap animate-in fade-in slide-in-from-left-2 duration-200 hidden sm:inline">
+                  {groupMembers.find(m => m.user_id === filtroMembroId)?.name?.split(' ')[0] || 'Membro'}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Resumo Dinâmico da Fatura quando filtrado por cartão */}
           {activeTab !== 'all' && activeTab !== 'debit' && cards && Array.isArray(cards) && (() => {
             try {
@@ -413,7 +484,7 @@ export default function Expenses() {
               // Somar despesas que PERTENCEM à fatura deste mês visualizado (Vencimento)
               const mesVisivel = currentMonth ? new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(currentMonth) : '';
               
-              const totalCycle = (unpaidExpensesGlobal || []).filter(e => {
+              const totalCycle = (filteredUnpaid || []).filter(e => {
                 if (e.card_id !== selectedCard.id) return false;
                 if (!e.expense_date || !selectedCard.closing_day) return false;
                 const mesFatura = identificarMesFatura(e.expense_date, selectedCard.closing_day);
