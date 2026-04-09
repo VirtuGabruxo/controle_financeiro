@@ -47,7 +47,6 @@ export default function Expenses() {
   const [installments, setInstallments] = useState('1');
   const [expenseType, setExpenseType] = useState('common'); // 'common', 'loan'
   const [paidInstallments, setPaidInstallments] = useState('0');
-  const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Card Manager Modal State
   const [showCardModal, setShowCardModal] = useState(false);
@@ -150,12 +149,10 @@ export default function Expenses() {
       } else {
         const qty = isRecurring ? 24 : parseInt(installments || '1');
         const baseAmount = (isRecurring || isLoan) ? parseFloat(amount) : (parseFloat(amount) / qty);
-        
-        const refFirstDate = (qty > 1 && !isRecurring) ? firstInstallmentDate : expenseDate;
         const paidCount = (qty > 1 && !isRecurring) ? parseInt(paidInstallments || '0') : 0;
 
         const payloads = [];
-        let d = new Date(`${refFirstDate}T12:00:00`);
+        let d = new Date(`${expenseDate}T12:00:00`);
 
         for (let i = 0; i < qty; i++) {
           const isPaid = i < paidCount;
@@ -234,7 +231,6 @@ export default function Expenses() {
     setInstallments('1');
     setExpenseType('common');
     setPaidInstallments('0');
-    setFirstInstallmentDate(new Date().toISOString().split('T')[0]);
     setShowExpenseModal(false);
   };
 
@@ -321,7 +317,7 @@ export default function Expenses() {
   const formProps = {
     editingId, description, setDescription, amount, setAmount, expenseDate, setExpenseDate,
     categoryId, setCategoryId, cardId, setCardId, installments, setInstallments,
-    expenseType, setExpenseType, paidInstallments, setPaidInstallments, firstInstallmentDate, setFirstInstallmentDate, cards, categories, isSubmitting, handleSubmit,
+    expenseType, setExpenseType, paidInstallments, setPaidInstallments, cards, categories, isSubmitting, handleSubmit,
     handleCancelEdit, setShowCardModal
   };
 
@@ -667,12 +663,12 @@ const ExpenseForm = ({
   embedded = true,
   editingId, description, setDescription, amount, setAmount, expenseDate, setExpenseDate,
   categoryId, setCategoryId, cardId, setCardId, installments, setInstallments,
-  expenseType, setExpenseType, paidInstallments, setPaidInstallments, firstInstallmentDate, setFirstInstallmentDate, cards, categories, isSubmitting, handleSubmit,
+  expenseType, setExpenseType, paidInstallments, setPaidInstallments, cards, categories, isSubmitting, handleSubmit,
   handleCancelEdit, setShowCardModal
 }) => (
   <div className={cn(
-    "bg-surface border border-border rounded-2xl p-5 md:p-6 h-fit",
-    embedded ? "relative lg:sticky lg:top-6" : ""
+    "bg-surface border border-border rounded-2xl p-5 md:p-6",
+    embedded ? "relative lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:overflow-x-hidden custom-scrollbar" : ""
   )}>
     <div className="flex justify-between items-center mb-6">
       <h2 className="text-lg md:text-xl font-semibold text-content flex items-center gap-2">
@@ -719,14 +715,11 @@ const ExpenseForm = ({
       </div>
 
       {parseInt(installments || '1') > 1 && !editingId && expenseType === 'common' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-background/30 p-4 rounded-xl border border-border mt-2">
+        <div className="bg-background/30 p-4 rounded-xl border border-border mt-2">
           <div className="space-y-1.5">
              <label className="text-[10px] font-semibold text-muted tracking-wide uppercase">Parcelas já pagas (Retroativas)</label>
              <input type="number" min="0" max={parseInt(installments || '1') - 1} value={paidInstallments} onChange={e => setPaidInstallments(e.target.value)} className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm" />
-          </div>
-          <div className="space-y-1.5">
-             <label className="text-[10px] font-semibold text-muted tracking-wide uppercase">Mês/Ano Pagamento da 1ª Parcela</label>
-             <input type="date" value={firstInstallmentDate} onChange={e => setFirstInstallmentDate(e.target.value)} className="w-full bg-surface border border-border rounded-xl px-3 py-[9px] text-content focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-sm [color-scheme:dark]" />
+             <p className="text-[10px] text-zinc-500 mt-1 px-1">As parcelas retroativas usam a Data da Compra como base e são projetadas nos meses anteriores.</p>
           </div>
         </div>
       )}
@@ -756,9 +749,11 @@ const ExpenseForm = ({
         </select>
       </div>
 
-      <button type="submit" disabled={isSubmitting} className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-4 text-sm md:text-base">
-        {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (<>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Lançamento'}</>)}
-      </button>
+      <div className="lg:sticky lg:bottom-0 bg-surface pt-4 z-10">
+        <button type="submit" disabled={isSubmitting} className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-sm md:text-base">
+          {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (<>{editingId ? <Edit2 size={18} /> : <Plus size={20} />}{editingId ? 'Salvar Alterações' : 'Adicionar Lançamento'}</>)}
+        </button>
+      </div>
     </form>
   </div>
 );

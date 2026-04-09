@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS assinaturas (
   categoria_id uuid REFERENCES categories(id) ON DELETE SET NULL,
   cartao_id uuid REFERENCES cards(id) ON DELETE SET NULL,
   dia_vencimento integer NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 31),
+  data_inicio date DEFAULT CURRENT_DATE,
   ativa boolean DEFAULT true,
   criado_em timestamptz DEFAULT now()
 );

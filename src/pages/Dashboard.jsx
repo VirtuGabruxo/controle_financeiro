@@ -183,7 +183,7 @@ export default function Dashboard() {
       const startDay = `${dStart.getFullYear()}-${String(dStart.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
 
       const { data: rawExpenses } = await supabase.from('expenses')
-        .select('amount, expense_date, card_id, paga, categories(name, color), cards(closing_day)')
+        .select('amount, expense_date, card_id, paga, categories(name, color), cards(closing_day, due_day)')
         .gte('expense_date', startDay)
         .lte('expense_date', lastDay)
         .eq('grupo_id', activeGroupId);
@@ -197,8 +197,14 @@ export default function Dashboard() {
           return expMonth === month && expYear === year;
         } else {
           const day = d.getDate();
-          const monthsToAdd = day >= exp.cards.closing_day ? 2 : 1;
-          const invoiceDate = new Date(expYear, expMonth + monthsToAdd, 1);
+          // Algoritmo alinhado com identificarMesFatura (2 passos)
+          let mAdd = day >= exp.cards.closing_day ? 1 : 0;
+          if (exp.cards.due_day != null) {
+            if (exp.cards.due_day < exp.cards.closing_day) mAdd += 1;
+          } else {
+            mAdd += 1; // fallback legado
+          }
+          const invoiceDate = new Date(expYear, expMonth + mAdd, 1);
           return invoiceDate.getMonth() === month && invoiceDate.getFullYear() === year;
         }
       });
@@ -225,7 +231,7 @@ export default function Dashboard() {
       const d8 = new Date(year, month - 7, 1);
       const eightMonthsAgo = `${d8.getFullYear()}-${String(d8.getMonth() + 1).padStart(2, '0')}-01T00:00:00`;
       const { data: evolExpensesRaw } = await supabase.from('expenses')
-        .select('amount, expense_date, card_id, cards(closing_day)')
+        .select('amount, expense_date, card_id, cards(closing_day, due_day)')
         .gte('expense_date', eightMonthsAgo)
         .lte('expense_date', lastDay)
         .eq('grupo_id', activeGroupId);
@@ -245,8 +251,13 @@ export default function Dashboard() {
           
           if (exp.card_id && exp.cards?.closing_day) {
              const day = d.getDate();
-             const monthsToAdd = day >= exp.cards.closing_day ? 2 : 1;
-             invoiceDate = new Date(d.getFullYear(), d.getMonth() + monthsToAdd, 1);
+             let mAdd = day >= exp.cards.closing_day ? 1 : 0;
+             if (exp.cards.due_day != null) {
+               if (exp.cards.due_day < exp.cards.closing_day) mAdd += 1;
+             } else {
+               mAdd += 1;
+             }
+             invoiceDate = new Date(d.getFullYear(), d.getMonth() + mAdd, 1);
           }
           
           const mKey = `${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(2, '0')}`;

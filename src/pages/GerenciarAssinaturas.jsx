@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { injetarPrimeiraDespesa, cancelarAssinatura } from '../lib/subscriptions';
 import { 
   Plus, 
   Calendar, 
@@ -14,11 +15,21 @@ import {
   RefreshCcw,
   Ban,
   Loader2,
-  DollarSign
+  DollarSign,
+  CalendarOff,
+  XCircle,
+  ShieldAlert,
+  CalendarCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const fmtBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+// Helper: retorna "YYYY-MM" do mês/ano atual
+const getCurrentMonthStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 export default function GerenciarAssinaturas() {
   const { user, activeGroupId } = useAuth();
@@ -30,6 +41,10 @@ export default function GerenciarAssinaturas() {
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
+  // Cancel Modal State
+  const [cancelModalSub, setCancelModalSub] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   
   const [form, setForm] = useState({
     nome: '',
@@ -37,6 +52,7 @@ export default function GerenciarAssinaturas() {
     categoria_id: '',
     cartao_id: '',
     dia_vencimento: 1,
+    data_inicio: getCurrentMonthStr(),
     ativa: true
   });
 
@@ -50,7 +66,7 @@ export default function GerenciarAssinaturas() {
     setLoading(true);
     try {
       const [subsRes, catsRes, cardsRes] = await Promise.all([
-        supabase.from('assinaturas').select('*, categories(name), cards(name)').eq('grupo_id', activeGroupId).order('ativa', { ascending: false }).order('nome'),
+        supabase.from('assinaturas').select('*, categories(name), cards(name, closing_day, due_day)').eq('grupo_id', activeGroupId).order('ativa', { ascending: false }).order('nome'),
         supabase.from('categories').select('*').order('name'),
         supabase.from('cards').select('*').eq('grupo_id', activeGroupId).order('name')
       ]);
@@ -68,12 +84,19 @@ export default function GerenciarAssinaturas() {
 
   const handleEdit = (sub) => {
     setEditingId(sub.id);
+    // Derivar mês/ano do data_inicio existente
+    let dataInicioStr = getCurrentMonthStr();
+    if (sub.data_inicio) {
+      const d = new Date(sub.data_inicio + 'T12:00:00');
+      dataInicioStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
     setForm({
       nome: sub.nome,
       valor: sub.valor,
       categoria_id: sub.categoria_id || '',
       cartao_id: sub.cartao_id || '',
       dia_vencimento: sub.dia_vencimento,
+      data_inicio: dataInicioStr,
       ativa: sub.ativa
     });
     setShowModal(true);
@@ -82,13 +105,17 @@ export default function GerenciarAssinaturas() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    // Converter "YYYY-MM" para "YYYY-MM-01" como DATE
+    const dataInicioDate = form.data_inicio ? `${form.data_inicio}-01` : new Date().toISOString().split('T')[0];
     
     const payload = {
       ...form,
       valor: parseFloat(form.valor.toString().replace(',', '.')),
       grupo_id: activeGroupId,
       categoria_id: form.categoria_id || null,
-      cartao_id: form.cartao_id || null
+      cartao_id: form.cartao_id || null,
+      data_inicio: dataInicioDate
     };
 
     try {
@@ -98,8 +125,19 @@ export default function GerenciarAssinaturas() {
         const { error } = await supabase.from('assinaturas').update(payload).eq('id', editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('assinaturas').insert(payload);
+        // Criar assinatura
+        const { data: newSub, error } = await supabase
+          .from('assinaturas')
+          .insert(payload)
+          .select('*')
+          .single();
         if (error) throw error;
+
+        // Se ativa, injetar primeira despesa imediatamente
+        if (newSub && newSub.ativa) {
+          const card = form.cartao_id ? cards.find(c => c.id === form.cartao_id) : null;
+          await injetarPrimeiraDespesa(newSub, card);
+        }
       }
       
       setShowModal(false);
@@ -113,44 +151,51 @@ export default function GerenciarAssinaturas() {
     }
   };
 
-  const handleCancelarAssinatura = async (sub) => {
-    const msg = sub.ativa 
-      ? `Deseja cancelar a assinatura "${sub.nome}"?\n\nIsso interromperá novas cobranças automáticas e removerá projeções futuras não pagas.`
-      : `Deseja reativar a assinatura "${sub.nome}"?`;
-    
-    if (!window.confirm(msg)) return;
+  // ── CANCELAMENTO INTELIGENTE ──
+  const handleOpenCancelModal = (sub) => {
+    if (!sub.ativa) {
+      // Se está cancelada, reativar direto
+      handleReativar(sub);
+      return;
+    }
+    setCancelModalSub(sub);
+  };
 
+  const handleReativar = async (sub) => {
     try {
-      // 1. Update status da assinatura
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('assinaturas')
-        .update({ ativa: !sub.ativa })
+        .update({ ativa: true })
         .eq('id', sub.id);
-      
-      if (updateError) throw updateError;
-
-      // 2. Se estiver cancelando, remover projeções futuras NÃO pagas
-      if (sub.ativa) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const { error: deleteError } = await supabase
-          .from('expenses')
-          .delete()
-          .eq('assinatura_id', sub.id)
-          .eq('paga', false)
-          .gt('expense_date', todayStr);
-        
-        if (deleteError) console.warn("Aviso: Falha ao remover projeções futuras, mas a assinatura foi inativada.");
-      }
-
+      if (error) throw error;
       fetchData();
     } catch (error) {
-      console.error("[ASSINATURAS] Erro ao alterar status:", error);
-      alert("Erro ao alterar status: " + (error?.message || JSON.stringify(error)));
+      console.error("[ASSINATURAS] Erro ao reativar:", error);
+      alert("Erro ao reativar: " + (error?.message || JSON.stringify(error)));
+    }
+  };
+
+  const handleCancelConfirm = async (mode) => {
+    if (!cancelModalSub) return;
+    setCancelLoading(true);
+
+    try {
+      const result = await cancelarAssinatura(mode, cancelModalSub.id);
+      if (!result.success) {
+        throw result.error || new Error('Falha no cancelamento');
+      }
+      setCancelModalSub(null);
+      fetchData();
+    } catch (error) {
+      console.error("[ASSINATURAS] Erro no cancelamento:", error);
+      alert("Erro ao cancelar: " + (error?.message || JSON.stringify(error)));
+    } finally {
+      setCancelLoading(false);
     }
   };
 
   const resetForm = () => {
-    setForm({ nome: '', valor: '', categoria_id: '', cartao_id: '', dia_vencimento: 1, ativa: true });
+    setForm({ nome: '', valor: '', categoria_id: '', cartao_id: '', dia_vencimento: 1, data_inicio: getCurrentMonthStr(), ativa: true });
     setEditingId(null);
   };
 
@@ -195,37 +240,49 @@ export default function GerenciarAssinaturas() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {ativas.map(sub => (
-                <div key={sub.id} className="group bg-surface/60 border border-border rounded-2xl p-5 hover:border-primary-glow/50 transition-all relative overflow-hidden backdrop-blur-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2.5 bg-background/50 rounded-xl border border-border text-primary-glow">
-                      <RefreshCcw size={22} />
+              {ativas.map(sub => {
+                // Extrair mês/ano de início para exibição
+                let inicioLabel = '—';
+                if (sub.data_inicio) {
+                  const d = new Date(sub.data_inicio + 'T12:00:00');
+                  inicioLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric' }).format(d);
+                }
+
+                return (
+                  <div key={sub.id} className="group bg-surface/60 border border-border rounded-2xl p-5 hover:border-primary-glow/50 transition-all relative overflow-hidden backdrop-blur-sm">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-2.5 bg-background/50 rounded-xl border border-border text-primary-glow">
+                        <RefreshCcw size={22} />
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEdit(sub)} className="p-2 hover:bg-border rounded-lg text-muted hover:text-content transition-colors"><Edit2 size={16}/></button>
+                        <button onClick={() => handleOpenCancelModal(sub)} className="p-2 hover:bg-rose-500/10 rounded-lg text-muted hover:text-rose-400 transition-colors" title="Cancelar Assinatura"><Ban size={16}/></button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(sub)} className="p-2 hover:bg-border rounded-lg text-muted hover:text-content transition-colors"><Edit2 size={16}/></button>
-                      <button onClick={() => handleCancelarAssinatura(sub)} className="p-2 hover:bg-rose-500/10 rounded-lg text-muted hover:text-rose-400 transition-colors" title="Cancelar Assinatura"><Ban size={16}/></button>
+                    
+                    <h3 className="font-bold text-lg text-content truncate mb-1">{sub.nome}</h3>
+                    <p className="text-2xl font-black text-primary-glow mb-4 tracking-tight">{fmtBRL(sub.valor)}</p>
+                    
+                    <div className="space-y-2.5 pt-4 border-t border-border/50">
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <Calendar size={14} /> Cobrança: <span className="text-zinc-300 font-medium">Todo dia {sub.dia_vencimento}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <CalendarCheck size={14} /> Início: <span className="text-zinc-300 font-medium capitalize">{inicioLabel}</span>
+                      </div>
+                      {sub.cards ? (
+                        <div className="flex items-center gap-2 text-xs text-muted">
+                          <CreditCard size={14} /> Cartão: <span className="text-zinc-300 font-medium">{sub.cards.name}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-muted">
+                          <DollarSign size={14} /> Método: <span className="text-zinc-300 font-medium">Débito Direto / Pix</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  
-                  <h3 className="font-bold text-lg text-content truncate mb-1">{sub.nome}</h3>
-                  <p className="text-2xl font-black text-primary-glow mb-4 tracking-tight">{fmtBRL(sub.valor)}</p>
-                  
-                  <div className="space-y-2.5 pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-2 text-xs text-muted">
-                      <Calendar size={14} /> Cobrança: <span className="text-zinc-300 font-medium">Todo dia {sub.dia_vencimento}</span>
-                    </div>
-                    {sub.cards ? (
-                      <div className="flex items-center gap-2 text-xs text-muted">
-                        <CreditCard size={14} /> Cartão: <span className="text-zinc-300 font-medium">{sub.cards.name}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs text-muted">
-                        <DollarSign size={14} /> Método: <span className="text-zinc-300 font-medium">Débito Direto / Pix</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -254,7 +311,7 @@ export default function GerenciarAssinaturas() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-muted">{fmtBRL(sub.valor)}</span>
-                    <button onClick={() => handleCancelarAssinatura(sub)} className="p-2 hover:bg-emerald-500/10 rounded-lg text-zinc-500 hover:text-emerald-400 transition-colors" title="Reativar"><RefreshCcw size={14}/></button>
+                    <button onClick={() => handleOpenCancelModal(sub)} className="p-2 hover:bg-emerald-500/10 rounded-lg text-zinc-500 hover:text-emerald-400 transition-colors" title="Reativar"><RefreshCcw size={14}/></button>
                   </div>
                 </div>
               ))}
@@ -264,7 +321,9 @@ export default function GerenciarAssinaturas() {
         </div>
       </div>
 
-      {/* Modal Nova/Editar */}
+      {/* ═══════════════════════════════════════════════════
+          MODAL: Nova/Editar Assinatura
+         ═══════════════════════════════════════════════════ */}
       {showModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-surface border border-border w-full max-w-lg rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
@@ -288,6 +347,23 @@ export default function GerenciarAssinaturas() {
                   <label className="block text-sm font-medium text-muted mb-1.5">Dia de Cobrança</label>
                   <input required type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => setForm({...form, dia_vencimento: parseInt(e.target.value)})} className="w-full bg-background border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-glow outline-none transition-all" />
                 </div>
+              </div>
+
+              {/* ── NOVO CAMPO: Mês/Ano de Início ── */}
+              <div>
+                <label className="block text-sm font-medium text-muted mb-1.5 flex items-center gap-1.5">
+                  <CalendarCheck size={14} className="text-primary-glow" /> Mês/Ano de Início
+                </label>
+                <input 
+                  required 
+                  type="month" 
+                  value={form.data_inicio} 
+                  onChange={e => setForm({...form, data_inicio: e.target.value})} 
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary-glow outline-none transition-all [color-scheme:dark]" 
+                />
+                <p className="text-[10px] text-zinc-500 mt-1.5 px-1 flex items-center gap-1">
+                  <AlertCircle size={10}/> A primeira cobrança será gerada automaticamente neste mês.
+                </p>
               </div>
 
               <div>
@@ -314,6 +390,97 @@ export default function GerenciarAssinaturas() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+          MODAL: Cancelamento Inteligente de Assinatura
+         ═══════════════════════════════════════════════════ */}
+      {cancelModalSub && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-border w-full max-w-md rounded-2xl shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden">
+            {/* Header */}
+            <div className="relative p-6 pb-4 border-b border-border bg-gradient-to-br from-rose-500/5 to-amber-500/5">
+              <button
+                onClick={() => setCancelModalSub(null)}
+                disabled={cancelLoading}
+                className="absolute top-4 right-4 p-2 hover:bg-background rounded-lg text-muted hover:text-content transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                  <ShieldAlert size={24} className="text-rose-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-content">Cancelar Assinatura</h2>
+                  <p className="text-sm text-muted">Como deseja prosseguir?</p>
+                </div>
+              </div>
+              <div className="bg-background/60 rounded-xl px-4 py-3 border border-border/50 flex items-center justify-between">
+                <span className="font-semibold text-content text-sm truncate">{cancelModalSub.nome}</span>
+                <span className="text-primary-glow font-bold text-sm flex-shrink-0 ml-2">{fmtBRL(cancelModalSub.valor)}/mês</span>
+              </div>
+            </div>
+
+            {/* Options */}
+            <div className="p-6 space-y-3">
+              {/* Opção A: A partir do próximo mês */}
+              <button
+                onClick={() => handleCancelConfirm('next_month')}
+                disabled={cancelLoading}
+                className="w-full group text-left p-4 rounded-xl border-2 border-border hover:border-amber-500/50 bg-background/50 hover:bg-amber-500/5 transition-all duration-200 disabled:opacity-50"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <CalendarOff size={20} className="text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-content text-sm mb-1 flex items-center gap-2">
+                      Cancelar a partir do próximo mês
+                      {cancelLoading && <Loader2 size={14} className="animate-spin text-amber-400" />}
+                    </h3>
+                    <p className="text-xs text-muted leading-relaxed">
+                      O lançamento <span className="text-amber-400 font-semibold">deste mês permanece</span> na sua tela de despesas. 
+                      Apenas futuras cobranças não pagas serão removidas.
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Opção B: Cancelar imediatamente */}
+              <button
+                onClick={() => handleCancelConfirm('immediate')}
+                disabled={cancelLoading}
+                className="w-full group text-left p-4 rounded-xl border-2 border-border hover:border-rose-500/50 bg-background/50 hover:bg-rose-500/5 transition-all duration-200 disabled:opacity-50"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-rose-500/10 rounded-lg border border-rose-500/20 flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <XCircle size={20} className="text-rose-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-content text-sm mb-1 flex items-center gap-2">
+                      Cancelar imediatamente
+                      {cancelLoading && <Loader2 size={14} className="animate-spin text-rose-400" />}
+                    </h3>
+                    <p className="text-xs text-muted leading-relaxed">
+                      Remove <span className="text-rose-400 font-semibold">todas as cobranças não pagas</span>, incluindo a deste mês. 
+                      Ideal para estornos ou cobranças que não ocorreram.
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              {/* Cancel Action */}
+              <button
+                onClick={() => setCancelModalSub(null)}
+                disabled={cancelLoading}
+                className="w-full mt-2 px-4 py-2.5 text-sm text-muted hover:text-content font-medium transition-colors rounded-xl hover:bg-background/50"
+              >
+                Voltar, não quero cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
